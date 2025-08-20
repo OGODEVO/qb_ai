@@ -1,0 +1,7 @@
+streamlit
+python-dotenv
+httpx
+pydantic==2.*
+tenacity
+python-dateutil
+openai
