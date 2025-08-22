@@ -12,7 +12,7 @@ load_dotenv()
 # Page config
 st.set_page_config(
     page_title="QuickBooks Financial Advisor Agent",
-    page_icon="💰",
+    page_icon="",
     layout="centered",
 )
 
