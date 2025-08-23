@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 
 from tools.quickbooks import qb_query
 from tools.browser import BrowserTool
+from core.attention import AttentionLayer
+from core.history import save_history, load_history
 
 # --- Initialization ---
 load_dotenv(override=True)
@@ -17,8 +19,17 @@ st.set_page_config(
     layout="centered",
 )
 
+# --- Load Models and Tools ---
+@st.cache_resource
+def load_attention_layer():
+    """Load the attention layer model, cached for performance."""
+    return AttentionLayer()
+
+attention_layer = load_attention_layer()
+
+
 # Title
-st.title("QuickBooks Financial Advisor Agent")
+st.title("Reki")
 
 # --- Sidebar for options ---
 with st.sidebar:
@@ -53,7 +64,7 @@ except KeyError:
 # --- System Prompt and Tools ---
 try:
     with open("prompts/system.txt", "r") as f:
-        SYSTEM_PROMPT = f.read()
+        BASE_SYSTEM_PROMPT = f.read()
 except FileNotFoundError:
     st.error("System prompt file not found at 'prompts/system.txt'.")
     st.stop()
@@ -118,7 +129,9 @@ if "Browser" in selected_tools:
 
 # Initialize chat history
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = load_history()
+if "attention_suggestion" not in st.session_state:
+    st.session_state.attention_suggestion = None
 
 # Display chat messages from history
 for message in st.session_state.messages:
@@ -138,30 +151,30 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         thinking_message = "Thinking..."
         message_placeholder.markdown(thinking_message + "▌")
 
-        # Construct messages for API call
-        api_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + st.session_state.messages
+        # Construct the system prompt with attention if available
+        system_prompt = BASE_SYSTEM_PROMPT
+        if st.session_state.attention_suggestion:
+            system_prompt += f"\n\n--- Meta-level Observation ---\n{st.session_state.attention_suggestion}"
 
-        if verbose:
-            with st.expander("Initial API Call Messages"):
-                st.json(api_messages)
+        # Construct messages for API call
+        api_messages = [{"role": "system", "content": system_prompt}] + st.session_state.messages
 
         # === Primary API Call ===
-        response = client.chat.completions.create(
-            model=os.getenv("XAI_MODEL", "grok-4"),
-            messages=api_messages,
-            tools=tools,
-            tool_choice="auto",
-        )
+        api_call_args = {
+            "model": os.getenv("XAI_MODEL", "grok-4"),
+            "messages": api_messages,
+        }
+        if tools:
+            api_call_args["tools"] = tools
+            api_call_args["tool_choice"] = "auto"
+
+        response = client.chat.completions.create(**api_call_args)
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
 
         # === Tool-Calling Logic ===
         if tool_calls:
-            if verbose:
-                with st.expander("Model's Tool Call Request"):
-                    st.json(response_message.dict())
-
-            api_messages.append(response_message)  # Add assistant's tool request
+            api_messages.append(response_message)
 
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
@@ -173,21 +186,23 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
 
                 try:
                     function_args = json.loads(tool_call.function.arguments)
+                    
                     if verbose:
-                        with st.expander(f"Executing Tool: `{function_name}`"):
-                            st.write("Arguments:")
+                        with st.expander("LLM's Thought Process"):
+                            st.markdown(f"**Tool:** `{function_name}`")
+                            st.markdown("**Arguments:**")
                             st.json(function_args)
                     else:
                         message_placeholder.markdown(
                             f"""{thinking_message}
 
-Calling tool: `{function_name}({json.dumps(function_args, indent=2)})`"""
+Calling tool: `{function_name}(...)`"""
                         )
                     
                     function_response = function_to_call(**function_args)
 
                     if verbose:
-                        with st.expander("Tool Response"):
+                        with st.expander("Tool Result"):
                             st.json(function_response)
                     
                     api_messages.append(
@@ -203,7 +218,6 @@ Calling tool: `{function_name}({json.dumps(function_args, indent=2)})`"""
                     continue
                 except Exception as e:
                     st.error(f"Error executing tool {function_name}: {e}")
-                    # Add error message to context for the model
                     api_messages.append(
                         {
                             "tool_call_id": tool_call.id,
@@ -212,10 +226,6 @@ Calling tool: `{function_name}({json.dumps(function_args, indent=2)})`"""
                             "content": json.dumps({"error": str(e)}),
                         }
                     )
-
-            if verbose:
-                with st.expander("Second API Call Messages (with tool results)"):
-                    st.json(api_messages)
 
             # === Secondary API Call (with tool results) ===
             message_placeholder.markdown(thinking_message + " Summarizing...▌")
@@ -229,9 +239,16 @@ Calling tool: `{function_name}({json.dumps(function_args, indent=2)})`"""
 
         # === Standard Response (no tool call) ===
         else:
-            if verbose:
-                with st.expander("Model's Response (no tool call)"):
-                    st.json(response_message.dict())
             final_response = response_message.content
             message_placeholder.markdown(final_response)
             st.session_state.messages.append({"role": "assistant", "content": final_response})
+
+        # --- Post-response Actions ---
+        # Save the entire conversation history
+        save_history(st.session_state.messages)
+
+        # Analyze conversation for attention
+        st.session_state.attention_suggestion = attention_layer.analyze_conversation(st.session_state.messages)
+        if verbose and st.session_state.attention_suggestion:
+            with st.expander("Attention Layer Suggestion"):
+                st.write(st.session_state.attention_suggestion)

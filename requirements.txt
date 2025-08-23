@@ -6,3 +6,7 @@ tenacity
 python-dateutil
 openai
 requests
+transformers
+sentence-transformers
+torch
+scikit-learn

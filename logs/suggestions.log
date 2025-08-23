@@ -1,0 +1,15 @@
+2025-08-23 21:18:31,427 - Use pytorch device_name: cpu
+2025-08-23 21:18:31,427 - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2025-08-23 21:19:58,319 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:20:37,855 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:21:14,364 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:22:03,010 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:28:17,046 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 400 Bad Request"
+2025-08-23 21:28:41,656 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 400 Bad Request"
+2025-08-23 21:32:27,160 - Use pytorch device_name: cpu
+2025-08-23 21:32:27,160 - Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2025-08-23 21:32:47,910 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:33:39,353 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:34:13,760 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:35:04,796 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 21:35:37,730 - HTTP Request: POST https://api.x.ai/v1/chat/completions "HTTP/1.1 200 OK"
