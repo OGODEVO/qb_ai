@@ -5,9 +5,10 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 from tools.quickbooks import qb_query
+from tools.browser import BrowserTool
 
 # --- Initialization ---
-load_dotenv()
+load_dotenv(override=True)
 
 # Page config
 st.set_page_config(
@@ -23,6 +24,16 @@ st.title("QuickBooks Financial Advisor Agent")
 with st.sidebar:
     st.header("Options")
     verbose = st.checkbox("Verbose Mode", help="If checked, the agent will show its reasoning and tool calls.")
+    st.subheader("Tools")
+    use_quickbooks = st.toggle("QuickBooks", value=True)
+    use_browser = st.toggle("Browser", value=True)
+
+# Create a list of selected tools based on the toggle values
+selected_tools = []
+if use_quickbooks:
+    selected_tools.append("QuickBooks")
+if use_browser:
+    selected_tools.append("Browser")
 
 
 # --- OpenAI Client Setup ---
@@ -47,52 +58,61 @@ except FileNotFoundError:
     st.error("System prompt file not found at 'prompts/system.txt'.")
     st.stop()
 
-# OpenAI-style tool definition for our qb_query function
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "qb_query",
-            "description": "Query QuickBooks for financial data like expenses, revenue, and reports.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "report": {
-                        "type": "string",
-                        "enum": ["pnl", "by_category", "expenses_by_vendor", "trial_balance", "custom"],
-                        "description": "The type of report to generate."
-                    },
-                    "start_date": {
-                        "type": "string",
-                        "format": "date",
-                        "description": "The start date for the report (YYYY-MM-DD)."
-                    },
-                    "end_date": {
-                        "type": "string",
-                        "format": "date",
-                        "description": "The end date for the report (YYYY-MM-DD)."
-                    },
-                    "filters": {
-                        "type": "object",
-                        "properties": {
-                            "account": {"type": "string"},
-                            "vendor": {"type": "string"},
-                            "category": {"type": "string"},
-                            "search": {"type": "string"},
-                            "limit": {"type": "integer"},
-                            "group_by": {"type": "string", "enum": ["vendor", "category"]},
-                            "compare": {"type": "string", "enum": ["prior_period"]},
-                        },
-                        "description": "Optional filters to apply to the query."
-                    }
-                },
-                "required": ["report", "start_date", "end_date"],
-            },
-        },
-    }
-]
+# Initialize tools
+tools = []
+available_tools = {}
 
-available_tools = {"qb_query": qb_query}
+if "QuickBooks" in selected_tools:
+    tools.append(
+        {
+            "type": "function",
+            "function": {
+                "name": "qb_query",
+                "description": "Query QuickBooks for financial data like expenses, revenue, and reports.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "report": {
+                            "type": "string",
+                            "enum": ["pnl", "by_category", "expenses_by_vendor", "trial_balance", "custom"],
+                            "description": "The type of report to generate."
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The start date for the report (YYYY-MM-DD)."
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The end date for the report (YYYY-MM-DD)."
+                        },
+                        "filters": {
+                            "type": "object",
+                            "properties": {
+                                "account": {"type": "string"},
+                                "vendor": {"type": "string"},
+                                "category": {"type": "string"},
+                                "search": {"type": "string"},
+                                "limit": {"type": "integer"},
+                                "group_by": {"type": "string", "enum": ["vendor", "category"]},
+                                "compare": {"type": "string", "enum": ["prior_period"]},
+                            },
+                            "description": "Optional filters to apply to the query."
+                        }
+                    },
+                    "required": ["report", "start_date", "end_date"],
+                },
+            },
+        }
+    )
+    available_tools["qb_query"] = qb_query
+
+if "Browser" in selected_tools:
+    browser_tool = BrowserTool()
+    tools.extend(browser_tool.get_tools())
+    available_tools["browser_search"] = browser_tool.search
+
 
 # --- Chat UI and Logic ---
 
@@ -158,10 +178,10 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
                             st.write("Arguments:")
                             st.json(function_args)
                     else:
-                         message_placeholder.markdown(
+                        message_placeholder.markdown(
                             f"""{thinking_message}
 
-Calling QuickBooks: `{function_name}({json.dumps(function_args, indent=2)})`"""
+Calling tool: `{function_name}({json.dumps(function_args, indent=2)})`"""
                         )
                     
                     function_response = function_to_call(**function_args)
