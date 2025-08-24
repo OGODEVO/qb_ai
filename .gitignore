@@ -9,3 +9,5 @@ wheels/
 # Virtual environments
 .venv
 .env 
+chat_history.json
+logs/suggestions.log

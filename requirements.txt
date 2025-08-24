@@ -10,3 +10,4 @@ transformers
 sentence-transformers
 torch
 scikit-learn
+tiktoken

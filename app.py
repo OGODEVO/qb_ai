@@ -23,7 +23,13 @@ st.set_page_config(
 @st.cache_resource
 def load_attention_layer():
     """Load the attention layer model, cached for performance."""
-    return AttentionLayer()
+    return AttentionLayer(
+        min_turns=3,
+        max_turns=8,
+        token_budget=700,
+        threshold=0.78,
+        decay=0.85
+    )
 
 attention_layer = load_attention_layer()
 
