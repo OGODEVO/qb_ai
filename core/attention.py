@@ -15,7 +15,7 @@ log_file = os.path.join(log_dir, 'suggestions.log')
 logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
 
 class AttentionLayer:
-    def __init__(self, model_name='all-MiniLM-L6-v2', min_turns=3, max_turns=8, token_budget=700, threshold=0.78, decay=0.85):
+    def __init__(self, model_name='all-MiniLM-L6-v2', min_turns=3, max_turns=8, token_budget=700, threshold=0.9, decay=0.85):
         """
         Initializes the AttentionLayer.
 
@@ -55,7 +55,7 @@ class AttentionLayer:
         
         return list(reversed(recent_messages))
 
-    def analyze_conversation(self, messages: list[dict]) -> str | None:
+    def analyze_conversation(self, messages: list[dict]) -> dict | None:
         """
         Analyzes the last N turns of a conversation to check for topic cohesion.
 
@@ -63,7 +63,7 @@ class AttentionLayer:
             messages (list[dict]): The list of chat messages.
 
         Returns:
-            str | None: A suggestion string if the topic is cohesive, otherwise None.
+            dict | None: A dictionary with the suggestion and similarity score, or None if analysis is not possible.
         """
         recent_messages = self._select_recent_messages(messages)
 
@@ -97,12 +97,12 @@ class AttentionLayer:
         # Calculate the weighted average similarity
         average_similarity = np.sum(weighted_similarities) / np.sum(weight_matrix[upper_triangle_indices])
 
+        suggestion = None
         if average_similarity > self.threshold:
             suggestion = self._generate_suggestion(recent_messages)
-            logging.info(f"Suggestion: {suggestion}")
-            return suggestion
-        
-        return None
+            logging.info(f"Suggestion: {suggestion} (Similarity: {average_similarity:.2f})")
+
+        return {"suggestion": suggestion, "similarity": average_similarity}
 
     def _generate_suggestion(self, recent_messages: list[str], top_n: int = 3) -> str:
         """

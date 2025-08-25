@@ -9,6 +9,7 @@ from tools.browser import BrowserTool
 from tools.meta_ads import meta_ads_query
 from core.attention import AttentionLayer
 from core.history import save_history, load_history
+from core.memory import LongTermMemory
 
 # --- Initialization ---
 load_dotenv(override=True)
@@ -28,11 +29,18 @@ def load_attention_layer():
         min_turns=3,
         max_turns=8,
         token_budget=700,
-        threshold=0.78,
         decay=0.85
     )
 
 attention_layer = load_attention_layer()
+
+
+@st.cache_resource
+def load_long_term_memory():
+    """Load the long-term memory store, cached for performance."""
+    return LongTermMemory()
+
+ltm = load_long_term_memory()
 
 
 # Title
@@ -210,8 +218,13 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         thinking_message = "Thinking..."
         message_placeholder.markdown(thinking_message + "▌")
 
-        # Construct the system prompt with attention if available
+        # Query long-term memory
+        retrieved_memories = ltm.query_memory(prompt)
+
+        # Construct the system prompt with attention and LTM if available
         system_prompt = BASE_SYSTEM_PROMPT
+        if retrieved_memories:
+            system_prompt += "\n\n--- Relevant Memories ---\n" + "\n".join(retrieved_memories)
         if st.session_state.attention_suggestion:
             system_prompt += f"\n\n--- Meta-level Observation ---\n{st.session_state.attention_suggestion}"
 
@@ -303,11 +316,34 @@ Calling tool: `{function_name}(...)`"""
             st.session_state.messages.append({"role": "assistant", "content": final_response})
 
         # --- Post-response Actions ---
-        # Save the entire conversation history
+
+        # Save the entire conversation history (short-term)
         save_history(st.session_state.messages)
 
-        # Analyze conversation for attention
-        st.session_state.attention_suggestion = attention_layer.analyze_conversation(st.session_state.messages)
-        if verbose and st.session_state.attention_suggestion:
-            with st.expander("Attention Layer Suggestion"):
-                st.write(st.session_state.attention_suggestion)
+        # Analyze conversation for attention and memory gating
+        attention_analysis = attention_layer.analyze_conversation(st.session_state.messages)
+        
+        if attention_analysis:
+            st.session_state.attention_suggestion = attention_analysis.get("suggestion")
+            similarity_score = attention_analysis.get("similarity")
+
+            if verbose:
+                with st.expander("Attention Analysis"):
+                    st.write(f"Similarity Score: {similarity_score:.2f}")
+                    if st.session_state.attention_suggestion:
+                        st.write(f"Suggestion: {st.session_state.attention_suggestion}")
+
+            # If the conversation is coherent (i.e., a suggestion was generated), evaluate it for long-term memory
+            if st.session_state.attention_suggestion:
+                conversation_to_evaluate = [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": final_response},
+                ]
+                summary = ltm.evaluate_and_summarize_conversation(client, conversation_to_evaluate)
+                if summary:
+                    ltm.save_memory(summary)
+                    if verbose:
+                        with st.expander("Memory Saved", expanded=True):
+                            st.write(summary)
+        else:
+            st.session_state.attention_suggestion = None

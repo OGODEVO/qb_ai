@@ -4,10 +4,20 @@ __pycache__/
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
 
 # Virtual environments
 .venv
-.env 
+venv/
+
+# Environment variables
+.env
+
+# Chat history
 chat_history.json
-logs/suggestions.log
+
+# Logs
+logs/
+
+# Local database
+chroma_db/

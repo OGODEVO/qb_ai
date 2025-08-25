@@ -11,3 +11,5 @@ sentence-transformers
 torch
 scikit-learn
 tiktoken
+chromadb
+onnxruntime
