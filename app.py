@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from tools.quickbooks import qb_query
 from tools.browser import BrowserTool
+from tools.meta_ads import meta_ads_query
 from core.attention import AttentionLayer
 from core.history import save_history, load_history
 
@@ -44,6 +45,7 @@ with st.sidebar:
     st.subheader("Tools")
     use_quickbooks = st.toggle("QuickBooks", value=True)
     use_browser = st.toggle("Browser", value=True)
+    use_meta_ads = st.toggle("Meta Ads", value=True)
 
 # Create a list of selected tools based on the toggle values
 selected_tools = []
@@ -51,6 +53,8 @@ if use_quickbooks:
     selected_tools.append("QuickBooks")
 if use_browser:
     selected_tools.append("Browser")
+if use_meta_ads:
+    selected_tools.append("Meta Ads")
 
 
 # --- OpenAI Client Setup ---
@@ -129,6 +133,55 @@ if "Browser" in selected_tools:
     browser_tool = BrowserTool()
     tools.extend(browser_tool.get_tools())
     available_tools["browser_search"] = browser_tool.search
+
+if "Meta Ads" in selected_tools:
+    tools.append(
+        {
+            "type": "function",
+            "function": {
+                "name": "meta_ads_query",
+                "description": "Query Meta Ads for advertising data.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "level": {
+                            "type": "string",
+                            "enum": ["ad", "adset", "campaign", "account"],
+                            "description": "The level to aggregate results at."
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The start date for the report (YYYY-MM-DD)."
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The end date for the report (YYYY-MM-DD)."
+                        },
+                        "fields": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "A list of fields to retrieve."
+                        },
+                        "filters": {
+                            "type": "object",
+                            "properties": {
+                                "campaign_id": {"type": "string"},
+                                "ad_set_id": {"type": "string"},
+                                "ad_id": {"type": "string"},
+                            },
+                            "description": "Optional filters to apply to the query."
+                        }
+                    },
+                    "required": ["level", "start_date", "end_date", "fields"],
+                },
+            },
+        }
+    )
+    available_tools["meta_ads_query"] = meta_ads_query
 
 
 # --- Chat UI and Logic ---
