@@ -52,6 +52,23 @@ class LongTermMemory:
         )
         logging.info(memory_text)
 
+    def remember_fact(self, fact: str):
+        """
+        Saves a specific fact to the long-term memory, intended for direct tool use.
+
+        Args:
+            fact (str): The specific fact or piece of information to remember.
+        """
+        if not fact:
+            return
+
+        self.collection.add(
+            documents=[fact],
+            metadatas=[{"timestamp": datetime.now().isoformat(), "type": "fact"}],
+            ids=[str(uuid.uuid4())]
+        )
+        logging.info(f"Fact saved: {fact}")
+
     def query_memory(self, query_text: str, n_results: int = 3) -> list[str]:
         """
         Queries the long-term memory for relevant information.

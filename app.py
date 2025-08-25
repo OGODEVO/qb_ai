@@ -91,6 +91,28 @@ except FileNotFoundError:
 tools = []
 available_tools = {}
 
+# Add the remember_fact tool by default
+tools.append(
+    {
+        "type": "function",
+        "function": {
+            "name": "remember_fact",
+            "description": "Saves a specific fact or piece of information to the agent's long-term memory. Use this when the user explicitly asks to remember something.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fact": {
+                        "type": "string",
+                        "description": "The specific fact or piece of information to remember."
+                    }
+                },
+                "required": ["fact"],
+            },
+        },
+    }
+)
+available_tools["remember_fact"] = ltm.remember_fact
+
 if "QuickBooks" in selected_tools:
     tools.append(
         {
