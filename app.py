@@ -449,11 +449,28 @@ def proactively_save_topics_to_memory(messages: list[dict]):
             ],
         )
         summary = response.choices[0].message.content
+
+        # Extract salient snippets as evidence
+        snippet_prompt = f"Given the following conversation snippets and a summary, extract the most salient sentences or short paragraphs that directly support the summary. Focus on key facts, decisions, or user preferences. 
+
+Summary: {summary}
+
+Conversation Snippets:
+" + "\n".join(relevant_messages)
+        
+        snippet_response = client.chat.completions.create(
+            model=os.getenv("XAI_MODEL", "grok-4"),
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that extracts key information from conversations."},
+                {"role": "user", "content": snippet_prompt},
+            ],
+        )
+        salient_snippets = snippet_response.choices[0].message.content.split("\n")
         
         memory_to_save = {
             "topic": topic,
             "summary": summary,
-            "evidence": relevant_messages,
+            "evidence": salient_snippets,
             "provenance": "proactive_memory_extraction"
         }
         
@@ -534,7 +551,8 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         # Construct the system prompt with attention and LTM if available
         system_prompt = BASE_SYSTEM_PROMPT
         if retrieved_memories:
-            system_prompt += "\n\n--- Relevant Memories ---" + "\n".join(retrieved_memories)
+            memory_summaries = [mem.get('summary', '') for mem in retrieved_memories]
+            system_prompt += "\n\n--- Relevant Memories---\n" + "\n".join(memory_summaries)
         if st.session_state.attention_suggestion:
             system_prompt += f"\n\n--- Meta-level Observation ---\n{st.session_state.attention_suggestion}"
 

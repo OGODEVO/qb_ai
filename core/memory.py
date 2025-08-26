@@ -57,22 +57,29 @@ class LongTermMemory:
         )
         self.collection = self.client.get_or_create_collection(name=collection_name)
 
-    def save_memory(self, memory_text: str):
+    def save_memory(self, memory: dict):
         """
-        Saves a text string to the long-term memory.
+        Saves a memory to the long-term memory.
 
         Args:
-            memory_text (str): The text to save.
+            memory (dict): The memory to save.
         """
-        if not memory_text:
+        if not memory:
             return
 
+        document = memory.get("summary", "")
+        metadata = {
+            "topic": memory.get("topic"),
+            "provenance": memory.get("provenance"),
+            "evidence": json.dumps(memory.get("evidence", []))
+        }
+
         self.collection.add(
-            documents=[memory_text],
-            metadatas=[{"timestamp": datetime.now().isoformat()}],
+            documents=[document],
+            metadatas=[metadata],
             ids=[str(uuid.uuid4())]
         )
-        logging.info(memory_text)
+        logger.info({"event": "memory_saved", "memory": memory})
 
     def remember_fact(self, fact: str):
         """
@@ -107,17 +114,21 @@ class LongTermMemory:
 
         results = self.collection.query(
             query_texts=[query_text],
-            n_results=n_results
+            n_results=n_results,
+            include=["documents", "metadatas"]
         )
         
-        documents = results.get("documents", [[]])[0]
         memories = []
-        for doc in documents:
-            try:
-                memories.append(json.loads(doc))
-            except json.JSONDecodeError:
-                # Handle old-style memories that are not JSON
-                memories.append({"summary": doc})
+        if results and results["documents"]:
+            for i, doc in enumerate(results["documents"][0]):
+                metadata = results["metadatas"][0][i]
+                memory = {
+                    "summary": doc,
+                    "topic": metadata.get("topic"),
+                    "provenance": metadata.get("provenance"),
+                    "evidence": json.loads(metadata.get("evidence", "[]"))
+                }
+                memories.append(memory)
         return memories
 
     def evaluate_and_summarize_conversation(self, client, conversation: list[dict]) -> str | None:
