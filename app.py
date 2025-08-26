@@ -10,6 +10,111 @@ from tools.meta_ads import meta_ads_query
 from core.attention import AttentionLayer
 from core.history import save_history, load_history
 from core.memory import LongTermMemory
+from tools.prompt_manager import PromptManager
+
+def self_correct(messages):
+    """Placeholder for self-correction logic."""
+    print("Self-correction triggered.")
+
+    # Create a prompt to identify the user's correction
+    correction_prompt = "The following is a conversation between a user and an AI agent. The user has expressed negative sentiment, so the agent is trying to self-correct. Please identify the incorrect statement in the agent's response and the user's suggested correction. Your output should be a JSON object with two keys: 'incorrect_statement' and 'suggested_correction'."
+
+    # Add the conversation history to the prompt
+    for msg in messages:
+        correction_prompt += f"\n{msg['role']}: {msg['content']}"
+
+    # Use a language model to identify the correction
+    response = client.chat.completions.create(
+        model=os.getenv("XAI_MODEL", "grok-4"),
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that identifies user corrections in a conversation."},
+            {"role": "user", "content": correction_prompt},
+        ],
+        response_format={"type": "json_object"},
+    )
+
+    correction = json.loads(response.choices[0].message.content)
+    incorrect_statement = correction.get("incorrect_statement")
+    suggested_correction = correction.get("suggested_correction")
+
+    # Generate a new instruction based on the correction
+    instruction_generation_prompt = f"The user has corrected the agent. The incorrect statement was: '{incorrect_statement}'. The user's suggested correction is: '{suggested_correction}'. Please generate a new instruction for the agent that will help it avoid making the same mistake in the future. The instruction should be a single sentence that starts with 'When...' or 'If...'."
+
+    response = client.chat.completions.create(
+        model=os.getenv("XAI_MODEL", "grok-4"),
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that generates instructions for AI agents."},
+            {"role": "user", "content": instruction_generation_prompt},
+        ],
+    )
+
+    new_instruction = response.choices[0].message.content
+    print(f"New instruction: {new_instruction}")
+
+    # Ask for user confirmation if required
+    if require_confirmation:
+        st.session_state.waiting_for_confirmation = True
+        st.session_state.new_instruction = new_instruction
+    else:
+        prompt_manager.add_to_prompt(new_instruction)
+        st.success("Instruction added!")
+
+
+def proactive_improvement(topic):
+    """Placeholder for proactive improvement logic."""
+    print(f"Proactive improvement triggered for topic: {topic}")
+
+    # Generate a learning plan
+    learning_plan_prompt = f"I am an AI agent and I have identified that I am underperforming on the topic of {topic}. Please generate a learning plan for me to improve my understanding of this topic. The learning plan should be a series of steps that I can take to improve my knowledge and skills on this topic. The steps should be actionable and specific. For example, instead of saying 'Read a book on {topic}', you should say 'Search for and read the top 3 articles on {topic}'."
+
+    response = client.chat.completions.create(
+        model=os.getenv("XAI_MODEL", "grok-4"),
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that generates learning plans."},
+            {"role": "user", "content": learning_plan_prompt},
+        ],
+    )
+
+    learning_plan = response.choices[0].message.content
+    st.session_state.learning_plan = learning_plan.split("\n")
+    st.session_state.learning_plan_step = 0
+
+    # Ask for user feedback on the learning plan if required
+    if require_confirmation:
+        st.session_state.waiting_for_learning_plan_feedback = True
+    else:
+        execute_learning_plan_step()
+
+def execute_learning_plan_step():
+    """Executes the current step in the learning plan."""
+    if st.session_state.learning_plan and st.session_state.learning_plan_step < len(st.session_state.learning_plan):
+        step = st.session_state.learning_plan[st.session_state.learning_plan_step]
+        st.session_state.learning_plan_step += 1
+
+        # Use a language model to select the appropriate tool to execute the step
+        tool_selection_prompt = f"I am an AI agent and I am currently executing a learning plan. The current step is: '{step}'. Please select the appropriate tool to execute this step. Your output should be a JSON object with two keys: 'tool' and 'query'. The 'tool' key should be the name of the tool to use, and the 'query' key should be the query to pass to the tool. For example, if the step is 'Search the web for articles on financial forecasting', your output should be: {{'tool': 'browser_search', 'query': 'financial forecasting'}}."
+
+        response = client.chat.completions.create(
+            model=os.getenv("XAI_MODEL", "grok-4"),
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that selects tools to execute learning plan steps."},
+                {"role": "user", "content": tool_selection_prompt},
+            ],
+            response_format={"type": "json_object"},
+        )
+
+        tool_selection = json.loads(response.choices[0].message.content)
+        tool_to_use = tool_selection.get("tool")
+        query = tool_selection.get("query")
+
+        # Execute the selected tool
+        if tool_to_use in available_tools:
+            function_to_call = available_tools[tool_to_use]
+            function_response = function_to_call(query)
+            print(f"Tool response: {function_response}")
+        else:
+            print(f"Unknown tool: {tool_to_use}")
+
 
 # --- Initialization ---
 load_dotenv(override=True)
@@ -42,6 +147,7 @@ def load_long_term_memory():
 
 ltm = load_long_term_memory()
 
+prompt_manager = PromptManager()
 
 # Title
 st.title("Reki")
@@ -54,6 +160,7 @@ with st.sidebar:
     use_quickbooks = st.toggle("QuickBooks", value=True)
     use_browser = st.toggle("Browser", value=True)
     use_meta_ads = st.toggle("Meta Ads", value=True)
+    require_confirmation = st.checkbox("Require Confirmation", value=True, help="If checked, the agent will ask for confirmation before modifying its prompt.")
 
 # Create a list of selected tools based on the toggle values
 selected_tools = []
@@ -80,10 +187,8 @@ except KeyError:
     st.stop()
 
 # --- System Prompt and Tools ---
-try:
-    with open("prompts/system.txt", "r") as f:
-        BASE_SYSTEM_PROMPT = f.read()
-except FileNotFoundError:
+BASE_SYSTEM_PROMPT = prompt_manager.get_prompt()
+if not BASE_SYSTEM_PROMPT:
     st.error("System prompt file not found at 'prompts/system.txt'.")
     st.stop()
 
@@ -92,7 +197,7 @@ tools = []
 available_tools = {}
 
 # Add the remember_fact tool by default
-tools.append(
+tools.extend([
     {
         "type": "function",
         "function": {
@@ -109,9 +214,45 @@ tools.append(
                 "required": ["fact"],
             },
         },
-    }
-)
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_to_prompt",
+            "description": "Adds a new line to the end of the agent's system prompt.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The text to add to the prompt."
+                    }
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "remove_from_prompt",
+            "description": "Removes a specific line from the agent's system prompt.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The text to remove from the prompt."
+                    }
+                },
+                "required": ["text"],
+            },
+        },
+    },
+])
 available_tools["remember_fact"] = ltm.remember_fact
+available_tools["add_to_prompt"] = prompt_manager.add_to_prompt
+available_tools["remove_from_prompt"] = prompt_manager.remove_from_prompt
 
 if "QuickBooks" in selected_tools:
     tools.append(
@@ -221,11 +362,52 @@ if "messages" not in st.session_state:
     st.session_state.messages = load_history()
 if "attention_suggestion" not in st.session_state:
     st.session_state.attention_suggestion = None
+if "waiting_for_confirmation" not in st.session_state:
+    st.session_state.waiting_for_confirmation = False
+if "new_instruction" not in st.session_state:
+    st.session_state.new_instruction = None
+if "learning_plan" not in st.session_state:
+    st.session_state.learning_plan = None
+if "learning_plan_step" not in st.session_state:
+    st.session_state.learning_plan_step = 0
+if "waiting_for_learning_plan_feedback" not in st.session_state:
+    st.session_state.waiting_for_learning_plan_feedback = False
 
 # Display chat messages from history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+
+if st.session_state.waiting_for_confirmation:
+    st.write("I have a new instruction for myself based on our conversation:")
+    st.write(st.session_state.new_instruction)
+    if st.button("Yes, add this instruction"):
+        prompt_manager.add_to_prompt(st.session_state.new_instruction)
+        st.session_state.waiting_for_confirmation = False
+        st.session_state.new_instruction = None
+        st.success("Instruction added!")
+    if st.button("No, don't add this instruction"):
+        st.session_state.waiting_for_confirmation = False
+        st.session_state.new_instruction = None
+        st.error("Instruction not added.")
+
+if st.session_state.learning_plan and not st.session_state.waiting_for_learning_plan_feedback:
+    st.write("I am currently working on the following learning plan:")
+    st.write(st.session_state.learning_plan)
+    st.write(f"Current step: {st.session_state.learning_plan[st.session_state.learning_plan_step]}")
+
+if st.session_state.waiting_for_learning_plan_feedback:
+    st.write("I have generated a learning plan for myself. Please review it and let me know if you would like me to proceed.")
+    st.write(st.session_state.learning_plan)
+    if st.button("Yes, proceed with the learning plan"):
+        st.session_state.waiting_for_learning_plan_feedback = False
+        execute_learning_plan_step()
+        st.success("Learning plan approved!")
+    if st.button("No, do not proceed with the learning plan"):
+        st.session_state.waiting_for_learning_plan_feedback = False
+        st.session_state.learning_plan = None
+        st.session_state.learning_plan_step = 0
+        st.error("Learning plan rejected.")
 
 # Accept user input
 if prompt := st.chat_input("How much did we spend on advertising last month?"):
@@ -246,7 +428,7 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         # Construct the system prompt with attention and LTM if available
         system_prompt = BASE_SYSTEM_PROMPT
         if retrieved_memories:
-            system_prompt += "\n\n--- Relevant Memories ---\n" + "\n".join(retrieved_memories)
+            system_prompt += "\n\n--- Relevant Memories ---" + "\n".join(retrieved_memories)
         if st.session_state.attention_suggestion:
             system_prompt += f"\n\n--- Meta-level Observation ---\n{st.session_state.attention_suggestion}"
 
@@ -354,6 +536,18 @@ Calling tool: `{function_name}(...)`"""
                     st.write(f"Similarity Score: {similarity_score:.2f}")
                     if st.session_state.attention_suggestion:
                         st.write(f"Suggestion: {st.session_state.attention_suggestion}")
+
+                    performance_report = attention_layer.get_performance_report()
+                    with st.expander("Performance Report"):
+                        st.write(performance_report)
+
+                    if "Negative messages: 1" in performance_report: # TODO: make this more robust
+                        self_correct(st.session_state.messages)
+
+                    underperforming_topics = attention_layer.get_underperforming_topics()
+                    if underperforming_topics:
+                        for topic in underperforming_topics:
+                            proactive_improvement(topic)
 
             # If the conversation is coherent (i.e., a suggestion was generated), evaluate it for long-term memory
             if st.session_state.attention_suggestion:

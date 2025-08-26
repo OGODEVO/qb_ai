@@ -35,6 +35,8 @@ class AttentionLayer:
         self.token_budget = token_budget
         self.threshold = threshold
         self.decay = decay
+        self.sentiment_analyzer = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+        self.performance_data = {}
 
     def _select_recent_messages(self, messages: list[dict]) -> list[str]:
         """
@@ -128,3 +130,73 @@ class AttentionLayer:
         keywords = [feature_names[i] for i in reversed(top_indices)]
 
         return f"The conversation is focused on: {', '.join(keywords)}"
+
+    def get_performance_report(self) -> str:
+        """
+        Analyzes the conversation history and returns a performance report.
+
+        Returns:
+            str: A performance report.
+        """
+        if not self.performance_data:
+            return "No performance data to analyze."
+
+        report = "**Performance Report:**\n"
+        for topic, data in self.performance_data.items():
+            report += f"\n**Topic:** {topic}\n"
+            report += f"- Positive messages: {data['positive']}\n"
+            report += f"- Negative messages: {data['negative']}\n"
+            report += f"- Neutral messages: {data['neutral']}\n"
+
+            if data['negative'] > 0:
+                report += "\n**Recommendation:** The user has expressed negative sentiment on this topic. Consider revising the prompt to be more helpful or empathetic."
+
+        return report
+
+    def get_most_relevant_user_message(self, agent_response: str, user_messages: list[str]) -> str:
+        """
+        Finds the user message that is most relevant to the agent's last response.
+
+        Args:
+            agent_response (str): The agent's last response.
+            user_messages (list[str]): A list of user messages.
+
+        Returns:
+            str: The most relevant user message.
+        """
+        if not user_messages:
+            return ""
+
+        # Generate embeddings for the agent's response and the user messages
+        agent_embedding = self.model.encode([agent_response])
+        user_embeddings = self.model.encode(user_messages)
+
+        # Calculate the cosine similarity between the agent's response and each user message
+        similarities = cosine_similarity(agent_embedding, user_embeddings)[0]
+
+        # Find the index of the most similar user message
+        most_similar_index = np.argmax(similarities)
+
+        return user_messages[most_similar_index]
+
+    def get_underperforming_topics(self, threshold: float = 0.5) -> list[str]:
+        """
+        Identifies topics where the agent's performance is below a certain threshold.
+
+        Args:
+            threshold (float): The performance threshold. If the ratio of negative messages to total messages is greater than this threshold, the topic is considered underperforming.
+
+        Returns:
+            list[str]: A list of the underperforming topics.
+        """
+        underperforming_topics = []
+        for topic, data in self.performance_data.items():
+            total_messages = data["positive"] + data["negative"] + data["neutral"]
+            if total_messages == 0:
+                continue
+
+            negative_ratio = data["negative"] / total_messages
+            if negative_ratio > threshold:
+                underperforming_topics.append(topic)
+
+        return underperforming_topics
