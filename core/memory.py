@@ -91,7 +91,7 @@ class LongTermMemory:
         )
         logger.info({"event": "fact_saved", "fact": fact})
 
-    def query_memory(self, query_text: str, n_results: int = 3) -> list[str]:
+    def query_memory(self, query_text: str, n_results: int = 3) -> list[dict]:
         """
         Queries the long-term memory for relevant information.
 
@@ -100,7 +100,7 @@ class LongTermMemory:
             n_results (int): The number of results to return.
 
         Returns:
-            list[str]: A list of the most relevant memories.
+            list[dict]: A list of the most relevant memories.
         """
         if not query_text:
             return []
@@ -110,7 +110,15 @@ class LongTermMemory:
             n_results=n_results
         )
         
-        return results.get("documents", [[]])[0]
+        documents = results.get("documents", [[]])[0]
+        memories = []
+        for doc in documents:
+            try:
+                memories.append(json.loads(doc))
+            except json.JSONDecodeError:
+                # Handle old-style memories that are not JSON
+                memories.append({"summary": doc})
+        return memories
 
     def evaluate_and_summarize_conversation(self, client, conversation: list[dict]) -> str | None:
         """
@@ -177,7 +185,11 @@ Output:
             logger.info({"event": "memory_evaluation", "result": result})
             
             if result.get("is_memorable"):
-                return result.get("summary")
+                return {
+                    "summary": result.get("summary"),
+                    "provenance": "conversation_summary",
+                    "evidence": [msg['content'] for msg in conversation]
+                }
             
             return None
 

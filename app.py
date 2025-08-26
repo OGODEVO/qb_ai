@@ -414,6 +414,53 @@ if "Meta Ads" in selected_tools:
     available_tools["meta_ads_query"] = meta_ads_query
 
 
+def proactively_save_topics_to_memory(messages: list[dict]):
+    """Proactively saves summaries of recurring topics to long-term memory."""
+    logger.info({"event": "proactive_memory_check_started"})
+    topics = attention_layer.extract_topics_from_history(messages)
+    if not topics:
+        logger.info({"event": "proactive_memory_check_ended", "reason": "no_topics_found"})
+        return
+
+    logger.info({"event": "proactive_memory_topics_found", "topics": topics})
+
+    for topic in topics:
+        # Check if the topic is already in memory
+        retrieved_memories = ltm.query_memory(topic, n_results=1)
+        if retrieved_memories and topic in retrieved_memories[0]:
+            logger.info({"event": "proactive_memory_topic_skipped", "topic": topic, "reason": "already_in_memory"})
+            continue
+
+        # Hard abort if no context is found
+        relevant_messages = [msg['content'] for msg in messages if topic in msg['content']]
+        if not relevant_messages:
+            logger.info({"event": "proactive_memory_topic_skipped", "topic": topic, "reason": "no_relevant_messages"})
+            continue
+
+        # Generate a summary of the topic
+        summary_prompt = f"The following are messages from a conversation. Please generate a concise summary of the key information related to the topic: '{topic}'."
+        summary_prompt += "\n\n---\n\n".join(relevant_messages[:5]) # Limit to 5 messages to avoid exceeding token limit
+
+        response = client.chat.completions.create(
+            model=os.getenv("XAI_MODEL", "grok-4"),
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that summarizes conversation topics."},
+                {"role": "user", "content": summary_prompt},
+            ],
+        )
+        summary = response.choices[0].message.content
+        
+        memory_to_save = {
+            "topic": topic,
+            "summary": summary,
+            "evidence": relevant_messages,
+            "provenance": "proactive_memory_extraction"
+        }
+        
+        ltm.save_memory(memory_to_save)
+        logger.info({"event": "proactive_memory_topic_saved", "memory": memory_to_save})
+
+
 # --- Chat UI and Logic ---
 
 # Initialize chat history
@@ -640,14 +687,14 @@ Calling tool: `{function_name}(...)`"""
                     {"role": "user", "content": prompt},
                     {"role": "assistant", "content": final_response},
                 ]
-                summary = ltm.evaluate_and_summarize_conversation(client, conversation_to_evaluate)
-                if summary:
-                    ltm.save_memory(summary)
+                memory = ltm.evaluate_and_summarize_conversation(client, conversation_to_evaluate)
+                if memory:
+                    ltm.save_memory(memory)
                     if verbose:
                         with st.expander("Memory Saved", expanded=True):
-                            st.markdown("**Summary:**")
-                            st.write(summary)
-                            st.markdown("**Original Conversation:**")
-                            st.json(conversation_to_evaluate)
+                            st.json(memory)
         else:
             st.session_state.attention_suggestion = None
+
+        # Proactively save topics to memory
+        proactively_save_topics_to_memory(st.session_state.messages)

@@ -39,7 +39,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 class AttentionLayer:
-    def __init__(self, model_name='all-MiniLM-L6-v2', min_turns=3, max_turns=8, token_budget=700, threshold=0.9, decay=0.85):
+    def __init__(self, model_name='all-mpnet-base-v2', min_turns=3, max_turns=8, token_budget=700, threshold=0.9, decay=0.85):
         """
         Initializes the AttentionLayer.
 
@@ -52,7 +52,7 @@ class AttentionLayer:
             decay (float): The decay factor for older messages.
         """
         self.model = SentenceTransformer(model_name)
-        self.vectorizer = TfidfVectorizer(stop_words='english')
+        self.vectorizer = TfidfVectorizer(stop_words="english")
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.min_turns = min_turns
         self.max_turns = max_turns
@@ -254,3 +254,41 @@ class AttentionLayer:
                 underperforming_topics.append(topic)
 
         return underperforming_topics
+
+    def extract_topics_from_history(self, messages: list[dict], top_n: int = 5) -> list[str]:
+        """
+        Extracts the most frequent topics from the chat history.
+
+        Args:
+            messages (list[dict]): The list of chat messages.
+            top_n (int): The number of top topics to return.
+
+        Returns:
+            list[str]: A list of the most frequent topics.
+        """
+        if not messages:
+            return []
+
+        # Extract content from messages
+        content = [msg['content'] for msg in messages]
+
+        # Extract keywords using TF-IDF
+        try:
+            tfidf_matrix = self.vectorizer.fit_transform(content)
+            feature_names = self.vectorizer.get_feature_names_out()
+            
+            # Sum the tf-idf scores for each term across all documents
+            summed_tfidf = tfidf_matrix.sum(axis=0).A1
+            
+            # Set a threshold to filter out less important topics
+            threshold = np.mean(summed_tfidf)
+            
+            # Get the indices of the top N scores that are above the threshold
+            top_indices = np.argsort(summed_tfidf)[-top_n:]
+            top_indices = [i for i in top_indices if summed_tfidf[i] > threshold]
+            
+            topics = [feature_names[i] for i in reversed(top_indices)]
+            return topics
+        except ValueError:
+            # This can happen if the vocabulary is empty (e.g., all stop words)
+            return []

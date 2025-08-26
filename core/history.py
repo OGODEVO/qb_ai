@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 
 HISTORY_FILE = "chat_history.json"
-RETENTION_HOURS = 24
+RETENTION_HOURS = 72
 
 def save_history(messages: list[dict]):
     """
