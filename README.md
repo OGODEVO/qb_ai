@@ -22,3 +22,16 @@ We are committed to building an AI assistant that is not only intelligent and ca
 ## Getting Started
 
 To get started with Reki, please refer to the technical documentation in the `docs` directory. (Note: I will create this directory and documentation in a future step if you would like me to).
+
+## Language Model Usage
+
+The agent uses the `grok-4` language model for a variety of tasks. Here is a breakdown of where the model is queried:
+
+1.  **Primary Response:** The main call to get the agent's response to a user's prompt.
+2.  **Tool Call Response:** If the agent uses a tool, a second call is made to summarize the tool's output.
+3.  **Self-Correction (Correction Identification):** If a user provides negative feedback, the model is used to identify the mistake.
+4.  **Self-Correction (Instruction Generation):** A second call is made to generate a new instruction for the agent to learn from the mistake.
+5.  **Proactive Improvement (Learning Plan):** If the agent identifies a topic it's underperforming on, it uses the model to generate a learning plan.
+6.  **Proactive Improvement (Tool Selection):** For each step in the learning plan, the model is used to select the appropriate tool.
+7.  **Proactive Memory (Topic Summary):** At the end of a conversation, the model is used to summarize the recurring topics for long-term memory.
+8.  **Memory Evaluation:** The model is used to evaluate whether a conversation is "memorable" and to generate a summary for long-term storage.
