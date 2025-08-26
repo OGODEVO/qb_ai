@@ -5,19 +5,41 @@ import logging
 import chromadb
 from datetime import datetime
 
+# Configure logging
+log_dir = 'logs'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+log_file = os.path.join(log_dir, 'memory.log')
+
+# Create a logger
+logger = logging.getLogger('memory_logger')
+logger.setLevel(logging.INFO)
+
+# Create a file handler
+handler = logging.FileHandler(log_file)
+
+# Create a JSON formatter
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "message": record.getMessage()
+        }
+        return json.dumps(log_record)
+
+formatter = JsonFormatter()
+handler.setFormatter(formatter)
+
+# Add the handler to the logger
+logger.addHandler(handler)
+
 class LongTermMemory:
     def __init__(self, collection_name="long_term_memory"):
         """
         Initializes the LongTermMemory class for ChromaDB Cloud.
         """
-        # Configure logging
-        log_dir = 'logs'
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        log_file = os.path.join(log_dir, 'memory.log')
-        logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - MEMORY SAVED - %(message)s')
-        
         try:
             api_key = os.environ["CHROMA_API_KEY"]
             tenant = os.environ["CHROMA_TENANT"]
@@ -67,7 +89,7 @@ class LongTermMemory:
             metadatas=[{"timestamp": datetime.now().isoformat(), "type": "fact"}],
             ids=[str(uuid.uuid4())]
         )
-        logging.info(f"Fact saved: {fact}")
+        logger.info({"event": "fact_saved", "fact": fact})
 
     def query_memory(self, query_text: str, n_results: int = 3) -> list[str]:
         """
@@ -152,6 +174,7 @@ Output:
             )
             
             result = json.loads(response.choices[0].message.content)
+            logger.info({"event": "memory_evaluation", "result": result})
             
             if result.get("is_memorable"):
                 return result.get("summary")
@@ -160,5 +183,5 @@ Output:
 
         except Exception as e:
             # Log the error or handle it as needed
-            print(f"Error during memory evaluation: {e}")
+            logger.error(f"Error during memory evaluation: {e}")
             return None

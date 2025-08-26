@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 import tiktoken
 from transformers import pipeline
 from sentence_transformers import SentenceTransformer
@@ -13,7 +14,29 @@ if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 
 log_file = os.path.join(log_dir, 'suggestions.log')
-logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+
+# Create a logger
+logger = logging.getLogger('attention_logger')
+logger.setLevel(logging.INFO)
+
+# Create a file handler
+handler = logging.FileHandler(log_file)
+
+# Create a JSON formatter
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "message": record.getMessage()
+        }
+        return json.dumps(log_record)
+
+formatter = JsonFormatter()
+handler.setFormatter(formatter)
+
+# Add the handler to the logger
+logger.addHandler(handler)
 
 class AttentionLayer:
     def __init__(self, model_name='all-MiniLM-L6-v2', min_turns=3, max_turns=8, token_budget=700, threshold=0.9, decay=0.85):
@@ -103,7 +126,11 @@ class AttentionLayer:
         suggestion = None
         if average_similarity > self.threshold:
             suggestion = self._generate_suggestion(recent_messages)
-            logging.info(f"Suggestion: {suggestion} (Similarity: {average_similarity:.2f})")
+            logger.info({
+                "suggestion": suggestion,
+                "average_similarity": f"{average_similarity:.2f}",
+                "recent_messages": recent_messages
+            })
 
         return {"suggestion": suggestion, "similarity": average_similarity}
 
@@ -132,25 +159,51 @@ class AttentionLayer:
 
         return f"The conversation is focused on: {', '.join(keywords)}"
 
-    def get_performance_report(self) -> str:
+    def _update_performance_data(self, recent_messages: list[str]):
+        """
+        Updates the performance data with the sentiment of the recent messages.
+        """
+        if len(recent_messages) < 1:
+            return
+
+        # For simplicity, we'll use the keywords from the last message as the topic
+        tfidf_matrix = self.vectorizer.fit_transform(recent_messages)
+        feature_names = self.vectorizer.get_feature_names_out()
+        summed_tfidf = tfidf_matrix.sum(axis=0)
+        top_indices = np.argsort(summed_tfidf).A1[-3:]
+        topic = ", ".join([feature_names[i] for i in reversed(top_indices)])
+
+        if topic not in self.performance_data:
+            self.performance_data[topic] = {"positive": 0, "negative": 0, "neutral": 0}
+
+        # Analyze the sentiment of the last message
+        last_message = recent_messages[-1]
+        sentiment = self.sentiment_analyzer(last_message)[0]["label"]
+
+        if sentiment == "POSITIVE":
+            self.performance_data[topic]["positive"] += 1
+        elif sentiment == "NEGATIVE":
+            self.performance_data[topic]["negative"] += 1
+        else:
+            self.performance_data[topic]["neutral"] += 1
+
+    def get_performance_report(self) -> dict:
         """
         Analyzes the conversation history and returns a performance report.
 
         Returns:
-            str: A performance report.
+            dict: A performance report.
         """
         if not self.performance_data:
-            return "No performance data to analyze."
+            return {"message": "No performance data to analyze."}
 
-        report = "**Performance Report:**\n"
+        report = {"topics": {}}
         for topic, data in self.performance_data.items():
-            report += f"\n**Topic:** {topic}\n"
-            report += f"- Positive messages: {data['positive']}\n"
-            report += f"- Negative messages: {data['negative']}\n"
-            report += f"- Neutral messages: {data['neutral']}\n"
-
-            if data['negative'] > 0:
-                report += "\n**Recommendation:** The user has expressed negative sentiment on this topic. Consider revising the prompt to be more helpful or empathetic."
+            report["topics"][topic] = {
+                "positive": data['positive'],
+                "negative": data['negative'],
+                "neutral": data['neutral']
+            }
 
         return report
 

@@ -1,6 +1,7 @@
 import os
 import inspect
 import json
+import logging
 import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -12,6 +13,36 @@ from core.attention import AttentionLayer
 from core.history import save_history, load_history
 from core.memory import LongTermMemory
 from tools.prompt_manager import PromptManager
+
+# Configure logging
+log_dir = 'logs'
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+
+log_file = os.path.join(log_dir, 'self_improvement.log')
+
+# Create a logger
+logger = logging.getLogger('self_improvement_logger')
+logger.setLevel(logging.INFO)
+
+# Create a file handler
+handler = logging.FileHandler(log_file)
+
+# Create a JSON formatter
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "message": record.getMessage()
+        }
+        return json.dumps(log_record)
+
+formatter = JsonFormatter()
+handler.setFormatter(formatter)
+
+# Add the handler to the logger
+logger.addHandler(handler)
 
 def self_correct(messages):
     """Placeholder for self-correction logic."""
@@ -77,6 +108,7 @@ def proactive_improvement(topic):
     )
 
     learning_plan = response.choices[0].message.content
+    logger.info({"event": "learning_plan_generated", "plan": learning_plan})
     st.session_state.learning_plan = learning_plan.split("\n")
     st.session_state.learning_plan_step = 0
 
@@ -85,36 +117,42 @@ def proactive_improvement(topic):
         st.session_state.waiting_for_learning_plan_feedback = True
     else:
         execute_learning_plan_step()
+    st.info(f"🧠 Proactive improvement: Generated a learning plan for the topic '{topic}'.")
 
 def execute_learning_plan_step():
     """Executes the current step in the learning plan."""
     if st.session_state.learning_plan and st.session_state.learning_plan_step < len(st.session_state.learning_plan):
         step = st.session_state.learning_plan[st.session_state.learning_plan_step]
+        logger.info({"event": "executing_learning_plan_step", "step": step})
         st.session_state.learning_plan_step += 1
 
         # Use a language model to select the appropriate tool to execute the step
         tool_selection_prompt = f"I am an AI agent and I am currently executing a learning plan. The current step is: '{step}'. Please select the appropriate tool to execute this step. Your output should be a JSON object with two keys: 'tool' and 'query'. The 'tool' key should be the name of the tool to use, and the 'query' key should be the query to pass to the tool. For example, if the step is 'Search the web for articles on financial forecasting', your output should be: {{'tool': 'browser_search', 'query': 'financial forecasting'}}."
 
-        response = client.chat.completions.create(
-            model=os.getenv("XAI_MODEL", "grok-4"),
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that selects tools to execute learning plan steps."},
-                {"role": "user", "content": tool_selection_prompt},
-            ],
-            response_format={"type": "json_object"},
-        )
+        try:
+            response = client.chat.completions.create(
+                model=os.getenv("XAI_MODEL", "grok-4"),
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that selects tools to execute learning plan steps."},
+                    {"role": "user", "content": tool_selection_prompt},
+                ],
+                response_format={"type": "json_object"},
+            )
 
-        tool_selection = json.loads(response.choices[0].message.content)
-        tool_to_use = tool_selection.get("tool")
-        query = tool_selection.get("query")
+            tool_selection = json.loads(response.choices[0].message.content)
+            logger.info({"event": "tool_selected_for_learning_step", "tool_selection": tool_selection})
+            tool_to_use = tool_selection.get("tool")
+            query = tool_selection.get("query")
 
-        # Execute the selected tool
-        if tool_to_use in available_tools:
-            function_to_call = available_tools[tool_to_use]
-            function_response = function_to_call(query)
-            print(f"Tool response: {function_response}")
-        else:
-            print(f"Unknown tool: {tool_to_use}")
+            # Execute the selected tool
+            if tool_to_use in available_tools:
+                function_to_call = available_tools[tool_to_use]
+                function_response = function_to_call(query)
+                logger.info({"event": "tool_executed_for_learning_step", "tool": tool_to_use, "response": function_response})
+            else:
+                logger.error({"event": "unknown_tool_for_learning_step", "tool": tool_to_use})
+        except Exception as e:
+            logger.error({"event": "error_executing_learning_plan_step", "error": str(e)})
 
 
 # --- Initialization ---
@@ -154,8 +192,28 @@ prompt_manager = PromptManager()
 st.title("Reki")
 
 # --- Sidebar for options ---
+# Create a static directory for avatars if it doesn't exist
+if not os.path.exists("static"):
+    os.makedirs("static")
+
 with st.sidebar:
     st.header("Options")
+    user_avatar_file = st.file_uploader("Your Avatar", type=["png", "jpg", "jpeg"])
+    agent_avatar_file = st.file_uploader("Agent Avatar", type=["png", "jpg", "jpeg"])
+
+    if user_avatar_file:
+        with open(os.path.join("static", "user_avatar.png"), "wb") as f:
+            f.write(user_avatar_file.getbuffer())
+        st.session_state.user_avatar = "static/user_avatar.png"
+    
+    if agent_avatar_file:
+        with open(os.path.join("static", "agent_avatar.png"), "wb") as f:
+            f.write(agent_avatar_file.getbuffer())
+        st.session_state.agent_avatar = "static/agent_avatar.png"
+
+    user_avatar = st.session_state.get("user_avatar", "🧑‍💻")
+    agent_avatar = st.session_state.get("agent_avatar", "🤖")
+
     verbose = st.checkbox("Verbose Mode", help="If checked, the agent will show its reasoning and tool calls.")
     st.subheader("Tools")
     use_quickbooks = st.toggle("QuickBooks", value=True)
@@ -418,7 +476,7 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         st.markdown(prompt)
 
     # Start assistant's turn
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=agent_avatar):
         message_placeholder = st.empty()
         thinking_message = "Thinking..."
         message_placeholder.markdown(thinking_message + "▌")
@@ -452,6 +510,7 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         # === Tool-Calling Logic ===
         if tool_calls:
             api_messages.append(response_message)
+            executed_tool_calls = set()
 
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
@@ -463,6 +522,12 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
 
                 try:
                     function_args = json.loads(tool_call.function.arguments)
+                    tool_call_identifier = f"{function_name}-{json.dumps(function_args, sort_keys=True)}"
+
+                    if tool_call_identifier in executed_tool_calls:
+                        continue # Skip duplicate tool calls
+                    
+                    executed_tool_calls.add(tool_call_identifier)
                     
                     if verbose:
                         with st.expander("LLM's Thought Process"):
@@ -555,10 +620,14 @@ Calling tool: `{function_name}(...)`"""
 
                     performance_report = attention_layer.get_performance_report()
                     with st.expander("Performance Report"):
-                        st.write(performance_report)
+                        st.json(performance_report)
 
-                    if "Negative messages: 1" in performance_report: # TODO: make this more robust
-                        self_correct(st.session_state.messages)
+                    # Check for negative messages and trigger self-correction
+                    if "topics" in performance_report:
+                        for topic, data in performance_report["topics"].items():
+                            if data['negative'] > 0:
+                                self_correct(st.session_state.messages)
+                                break # Trigger only once per turn
 
                     underperforming_topics = attention_layer.get_underperforming_topics()
                     if underperforming_topics:
