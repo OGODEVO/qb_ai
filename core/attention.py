@@ -273,13 +273,14 @@ class AttentionLayer:
 
         return underperforming_topics
 
-    def extract_topics_from_history(self, messages: list[dict], top_n: int = 5) -> list[str]:
+    def extract_topics_from_history(self, messages: list[dict], top_n: int = 5, min_word_length: int = 4) -> list[str]:
         """
         Extracts the most frequent topics from the chat history.
 
         Args:
             messages (list[dict]): The list of chat messages.
             top_n (int): The number of top topics to return.
+            min_word_length (int): The minimum length of a word to be considered a topic.
 
         Returns:
             list[str]: A list of the most frequent topics.
@@ -301,9 +302,9 @@ class AttentionLayer:
             # Set a threshold to filter out less important topics
             threshold = np.mean(summed_tfidf)
             
-            # Get the indices of the top N scores that are above the threshold
+            # Get the indices of the top N scores that are above the threshold and meet the word length requirement
             top_indices = np.argsort(summed_tfidf)[-top_n:]
-            top_indices = [i for i in top_indices if summed_tfidf[i] > threshold]
+            top_indices = [i for i in top_indices if summed_tfidf[i] > threshold and len(feature_names[i]) >= min_word_length]
             
             topics = [feature_names[i] for i in reversed(top_indices)]
 

@@ -213,8 +213,23 @@ Output:
             logger.info({"event": "memory_evaluation", "result": result})
             
             if result.get("is_memorable"):
+                summary = result.get("summary")
+
+                # Generate a topic name from the summary
+                topic_generation_prompt = f"Based on the following summary, generate a short, descriptive topic name for this conversation. The topic name should be a few words long and capture the main subject of the conversation.\n\nSummary: {summary}"
+
+                topic_response = client.chat.completions.create(
+                    model=os.getenv("XAI_MODEL", "grok-4"),
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant that generates concise topic names for conversations."},
+                        {"role": "user", "content": topic_generation_prompt},
+                    ],
+                )
+                topic_name = topic_response.choices[0].message.content.strip('"')
+
                 return {
-                    "summary": result.get("summary"),
+                    "topic": topic_name,
+                    "summary": summary,
                     "provenance": "conversation_summary",
                     "evidence": [msg['content'] for msg in conversation]
                 }

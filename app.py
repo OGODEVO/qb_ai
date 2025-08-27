@@ -421,65 +421,77 @@ if "Meta Ads" in selected_tools:
 def proactively_save_topics_to_memory(messages: list[dict]):
     """Proactively saves summaries of recurring topics to long-term memory."""
     logger.info({"event": "proactive_memory_check_started"})
-    topics = attention_layer.extract_topics_from_history(messages)
-    if not topics:
-        logger.info({"event": "proactive_memory_check_ended", "reason": "no_topics_found"})
+    keywords = attention_layer.extract_topics_from_history(messages)
+    if not keywords:
+        logger.info({"event": "proactive_memory_check_ended", "reason": "no_keywords_found"})
         return
 
-    logger.info({"event": "proactive_memory_topics_found", "count": len(topics), "topics": topics})
+    logger.info({"event": "proactive_memory_keywords_found", "count": len(keywords), "keywords": keywords})
 
-    for topic in topics:
-        # Check if the topic is already in memory
-        retrieved_memories = ltm.query_memory(topic, n_results=1)
-        if retrieved_memories and topic in retrieved_memories[0]:
-            logger.info({"event": "proactive_memory_topic_skipped", "topic": topic, "reason": "already_in_memory"})
-            continue
+    # Generate a topic name from the keywords
+    topic_generation_prompt = f"Based on the following keywords and conversation snippets, generate a short, descriptive topic name for this conversation. The topic name should be a few words long and capture the main subject of the conversation.\n\nKeywords: {', '.join(keywords)}\n\nConversation Snippets:\n${"\n".join([msg['content'] for msg in messages])}"
 
-        # Hard abort if no context is found
-        relevant_messages = [msg['content'] for msg in messages if topic.lower() in msg['content'].lower()]
-        if not relevant_messages:
-            logger.info({"event": "proactive_memory_topic_skipped", "topic": topic, "reason": "no_relevant_messages"})
-            continue
+    response = client.chat.completions.create(
+        model=os.getenv("XAI_MODEL", "grok-4"),
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that generates concise topic names for conversations."},
+            {"role": "user", "content": topic_generation_prompt},
+        ],
+    )
+    topic_name = response.choices[0].message.content.strip('"')
 
-        # Generate a summary of the topic
-        summary_prompt = f"The following are messages from a conversation. Please generate a concise summary of the key information related to the topic: '{topic}'."
-        summary_prompt += "\n\n---\n\n".join(relevant_messages[:5]) # Limit to 5 messages to avoid exceeding token limit
+    # Check if the topic is already in memory
+    retrieved_memories = ltm.query_memory(topic_name, n_results=1)
+    if retrieved_memories and topic_name in retrieved_memories[0]:
+        logger.info({"event": "proactive_memory_topic_skipped", "topic": topic_name, "reason": "already_in_memory"})
+        return
 
-        response = client.chat.completions.create(
-            model=os.getenv("XAI_MODEL", "grok-4"),
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that summarizes conversation topics."},
-                {"role": "user", "content": summary_prompt},
-            ],
-        )
-        summary = response.choices[0].message.content
+    # Hard abort if no context is found
+    relevant_messages = [msg['content'] for msg in messages if any(keyword.lower() in msg['content'].lower() for keyword in keywords)]
+    if not relevant_messages:
+        logger.info({"event": "proactive_memory_topic_skipped", "topic": topic_name, "reason": "no_relevant_messages"})
+        return
 
-        # Extract salient snippets as evidence
-        snippet_prompt = f"""Given the following conversation snippets and a summary, extract the most salient sentences or short paragraphs that directly support the summary. Focus on key facts, decisions, or user preferences.
+    # Generate a summary of the topic
+    summary_prompt = f"The following are messages from a conversation. Please generate a concise summary of the key information related to the topic: '{topic_name}'."
+    summary_prompt += "\n\n---\n\n".join(relevant_messages[:5]) # Limit to 5 messages to avoid exceeding token limit
+
+    response = client.chat.completions.create(
+        model=os.getenv("XAI_MODEL", "grok-4"),
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that summarizes conversation topics."},
+            {"role": "user", "content": summary_prompt},
+        ],
+    )
+    summary = response.choices[0].message.content
+
+    # Extract salient snippets as evidence
+    snippet_prompt = f"""Given the following conversation snippets and a summary, extract the most salient sentences or short paragraphs that directly support the summary. Focus on key facts, decisions, or user preferences.
 
 Summary: {summary}
 
 Conversation Snippets:
-{"\n".join(relevant_messages)}"""
-        
-        snippet_response = client.chat.completions.create(
-            model=os.getenv("XAI_MODEL", "grok-4"),
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that extracts key information from conversations."},
-                {"role": "user", "content": snippet_prompt},
-            ],
-        )
-        salient_snippets = snippet_response.choices[0].message.content.split("\n")
-        
-        memory_to_save = {
-            "topic": topic,
-            "summary": summary,
-            "evidence": salient_snippets,
-            "provenance": "proactive_memory_extraction"
-        }
-        
-        ltm.save_memory(memory_to_save)
-        logger.info({"event": "proactive_memory_topic_saved", "topic": topic})
+${"\n".join(relevant_messages)}"""
+    
+    snippet_response = client.chat.completions.create(
+        model=os.getenv("XAI_MODEL", "grok-4"),
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that extracts key information from conversations."},
+            {"role": "user", "content": snippet_prompt},
+        ],
+    )
+    salient_snippets = snippet_response.choices[0].message.content.split("\n")
+    
+    memory_to_save = {
+        "topic": topic_name,
+        "summary": summary,
+        "evidence": salient_snippets,
+        "provenance": "proactive_memory_extraction"
+    }
+    
+    ltm.save_memory(memory_to_save)
+    logger.info({"event": "proactive_memory_topic_saved", "topic": topic_name})
+
 
 
 
@@ -731,7 +743,7 @@ Calling tool: `{function_name}(...)`"""
         # Proactively save topics to memory
         st.session_state.messages_since_last_analysis += 1
 
-        if st.session_state.messages_since_last_analysis >= 5:
-            messages_to_process = st.session_state.messages[-5:]
+        if st.session_state.messages_since_last_analysis >= 20:
+            messages_to_process = st.session_state.messages[-20:]
             proactively_save_topics_to_memory(messages_to_process)
             st.session_state.messages_since_last_analysis = 0
