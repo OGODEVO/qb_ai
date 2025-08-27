@@ -500,6 +500,8 @@ if "learning_plan_step" not in st.session_state:
     st.session_state.learning_plan_step = 0
 if "waiting_for_learning_plan_feedback" not in st.session_state:
     st.session_state.waiting_for_learning_plan_feedback = False
+if "messages_since_last_analysis" not in st.session_state:
+    st.session_state.messages_since_last_analysis = 0
 
 # Display chat messages from history
 for message in st.session_state.messages:
@@ -727,4 +729,9 @@ Calling tool: `{function_name}(...)`"""
             st.toast(f"🧠 I've learned to ignore the following words to improve my focus: {', '.join(candidate_stop_words)}")
 
         # Proactively save topics to memory
-        proactively_save_topics_to_memory(st.session_state.messages)
+        st.session_state.messages_since_last_analysis += 1
+
+        if st.session_state.messages_since_last_analysis >= 5:
+            messages_to_process = st.session_state.messages[-5:]
+            proactively_save_topics_to_memory(messages_to_process)
+            st.session_state.messages_since_last_analysis = 0
