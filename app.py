@@ -451,12 +451,12 @@ def proactively_save_topics_to_memory(messages: list[dict]):
         summary = response.choices[0].message.content
 
         # Extract salient snippets as evidence
-        snippet_prompt = f"Given the following conversation snippets and a summary, extract the most salient sentences or short paragraphs that directly support the summary. Focus on key facts, decisions, or user preferences. 
+        snippet_prompt = f"""Given the following conversation snippets and a summary, extract the most salient sentences or short paragraphs that directly support the summary. Focus on key facts, decisions, or user preferences.
 
 Summary: {summary}
 
 Conversation Snippets:
-" + "\n".join(relevant_messages)
+{"\n".join(relevant_messages)}"""
         
         snippet_response = client.chat.completions.create(
             model=os.getenv("XAI_MODEL", "grok-4"),
