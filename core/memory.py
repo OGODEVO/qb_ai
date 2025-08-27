@@ -68,10 +68,27 @@ class LongTermMemory:
             return
 
         document = memory.get("summary", "")
+
+        # Truncate evidence to avoid ChromaDB quota errors
+        evidence = memory.get("evidence", [])
+        truncated_evidence = []
+        MAX_EVIDENCE_SIZE = 4000  # Leave some buffer for other metadata
+
+        for snippet in evidence:
+            # Truncate individual snippet if it's too long
+            if len(snippet) > 500:
+                snippet = snippet[:500] + "..."
+            
+            # Check if adding the new snippet exceeds the total size limit
+            if len(json.dumps(truncated_evidence + [snippet])) > MAX_EVIDENCE_SIZE:
+                break # Stop adding snippets if we're approaching the limit
+            
+            truncated_evidence.append(snippet)
+
         metadata = {
             "topic": memory.get("topic"),
             "provenance": memory.get("provenance"),
-            "evidence": json.dumps(memory.get("evidence", []))
+            "evidence": json.dumps(truncated_evidence)
         }
 
         self.collection.add(
@@ -79,7 +96,7 @@ class LongTermMemory:
             metadatas=[metadata],
             ids=[str(uuid.uuid4())]
         )
-        logger.info({"event": "memory_saved", "memory": memory})
+        logger.info({"event": "memory_saved", "topic": memory.get("topic")})
 
     def remember_fact(self, fact: str):
         """

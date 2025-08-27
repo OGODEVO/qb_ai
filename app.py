@@ -14,35 +14,39 @@ from core.history import save_history, load_history
 from core.memory import LongTermMemory
 from tools.prompt_manager import PromptManager
 
-# Configure logging
-log_dir = 'logs'
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
+@st.cache_resource
+def get_logger():
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
-log_file = os.path.join(log_dir, 'self_improvement.log')
+    log_file = os.path.join(log_dir, 'self_improvement.log')
 
-# Create a logger
-logger = logging.getLogger('self_improvement_logger')
-logger.setLevel(logging.INFO)
+    logger = logging.getLogger('self_improvement_logger')
+    logger.setLevel(logging.INFO)
 
-# Create a file handler
-handler = logging.FileHandler(log_file)
+    # To prevent duplicate handlers, we clear existing handlers
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
-# Create a JSON formatter
-class JsonFormatter(logging.Formatter):
-    def format(self, record):
-        log_record = {
-            "timestamp": self.formatTime(record, self.datefmt),
-            "level": record.levelname,
-            "message": record.getMessage()
-        }
-        return json.dumps(log_record)
+    handler = logging.FileHandler(log_file)
 
-formatter = JsonFormatter()
-handler.setFormatter(formatter)
+    class JsonFormatter(logging.Formatter):
+        def format(self, record):
+            log_record = {
+                "timestamp": self.formatTime(record, self.datefmt),
+                "level": record.levelname,
+                "message": record.getMessage()
+            }
+            return json.dumps(log_record)
 
-# Add the handler to the logger
-logger.addHandler(handler)
+    formatter = JsonFormatter()
+    handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+    return logger
+
+logger = get_logger()
 
 def self_correct(messages):
     """Placeholder for self-correction logic."""
@@ -422,7 +426,7 @@ def proactively_save_topics_to_memory(messages: list[dict]):
         logger.info({"event": "proactive_memory_check_ended", "reason": "no_topics_found"})
         return
 
-    logger.info({"event": "proactive_memory_topics_found", "topics": topics})
+    logger.info({"event": "proactive_memory_topics_found", "count": len(topics), "topics": topics})
 
     for topic in topics:
         # Check if the topic is already in memory
@@ -432,7 +436,7 @@ def proactively_save_topics_to_memory(messages: list[dict]):
             continue
 
         # Hard abort if no context is found
-        relevant_messages = [msg['content'] for msg in messages if topic in msg['content']]
+        relevant_messages = [msg['content'] for msg in messages if topic.lower() in msg['content'].lower()]
         if not relevant_messages:
             logger.info({"event": "proactive_memory_topic_skipped", "topic": topic, "reason": "no_relevant_messages"})
             continue
@@ -475,7 +479,8 @@ Conversation Snippets:
         }
         
         ltm.save_memory(memory_to_save)
-        logger.info({"event": "proactive_memory_topic_saved", "memory": memory_to_save})
+        logger.info({"event": "proactive_memory_topic_saved", "topic": topic})
+
 
 
 # --- Chat UI and Logic ---
@@ -713,6 +718,13 @@ Calling tool: `{function_name}(...)`"""
                             st.json(memory)
         else:
             st.session_state.attention_suggestion = None
+
+        # Proactively learn and add new stop words
+        candidate_stop_words = attention_layer.identify_candidate_stop_words()
+        if candidate_stop_words:
+            for word in candidate_stop_words:
+                attention_layer.add_custom_stop_word(word)
+            st.toast(f"🧠 I've learned to ignore the following words to improve my focus: {', '.join(candidate_stop_words)}")
 
         # Proactively save topics to memory
         proactively_save_topics_to_memory(st.session_state.messages)

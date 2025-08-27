@@ -52,7 +52,25 @@ class AttentionLayer:
             decay (float): The decay factor for older messages.
         """
         self.model = SentenceTransformer(model_name)
-        self.vectorizer = TfidfVectorizer(stop_words="english")
+        
+        self.custom_stop_words_path = 'core/custom_stop_words.json'
+        self.topic_frequencies_path = 'core/topic_frequencies.json'
+
+        try:
+            with open(self.custom_stop_words_path, 'r') as f:
+                self.custom_stop_words = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.custom_stop_words = []
+
+        try:
+            with open(self.topic_frequencies_path, 'r') as f:
+                self.topic_frequencies = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.topic_frequencies = {}
+
+        stop_words = list(TfidfVectorizer(stop_words="english").get_stop_words()) + self.custom_stop_words
+
+        self.vectorizer = TfidfVectorizer(stop_words=stop_words)
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.min_turns = min_turns
         self.max_turns = max_turns
@@ -288,7 +306,47 @@ class AttentionLayer:
             top_indices = [i for i in top_indices if summed_tfidf[i] > threshold]
             
             topics = [feature_names[i] for i in reversed(top_indices)]
+
+            # Update topic frequencies
+            for topic in topics:
+                self.topic_frequencies[topic] = self.topic_frequencies.get(topic, 0) + 1
+
+            with open(self.topic_frequencies_path, 'w') as f:
+                json.dump(self.topic_frequencies, f, indent=2)
+
             return topics
         except ValueError:
             # This can happen if the vocabulary is empty (e.g., all stop words)
             return []
+
+    def identify_candidate_stop_words(self, threshold=5):
+        """
+        Identifies candidate stop words based on topic frequency.
+
+        Args:
+            threshold (int): The frequency threshold to consider a topic as a candidate stop word.
+
+        Returns:
+            list[str]: A list of candidate stop words.
+        """
+        candidate_stop_words = []
+        for topic, frequency in self.topic_frequencies.items():
+            if frequency > threshold and topic not in self.custom_stop_words:
+                candidate_stop_words.append(topic)
+        return candidate_stop_words
+
+    def add_custom_stop_word(self, word: str):
+        """
+        Adds a word to the custom stop word list and updates the vectorizer.
+
+        Args:
+            word (str): The word to add to the custom stop word list.
+        """
+        if word not in self.custom_stop_words:
+            self.custom_stop_words.append(word)
+            with open(self.custom_stop_words_path, 'w') as f:
+                json.dump(self.custom_stop_words, f, indent=2)
+            
+            # Re-initialize the vectorizer with the updated stop words
+            stop_words = list(TfidfVectorizer(stop_words="english").get_stop_words()) + self.custom_stop_words
+            self.vectorizer = TfidfVectorizer(stop_words=stop_words)
