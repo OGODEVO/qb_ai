@@ -243,6 +243,10 @@ try:
         api_key=os.environ["XAI_API_KEY"],
         base_url=os.environ["XAI_BASE_URL"],
     )
+    ollama_client = OpenAI(
+        api_key="ollama",
+        base_url="http://localhost:11434/v1",
+    )
 except KeyError:
     st.error(
         "Missing xAI credentials. Please set XAI_API_KEY and XAI_BASE_URL in your .env file."
@@ -429,10 +433,10 @@ def proactively_save_topics_to_memory(messages: list[dict]):
     logger.info({"event": "proactive_memory_keywords_found", "count": len(keywords), "keywords": keywords})
 
     # Generate a topic name from the keywords
-    topic_generation_prompt = f"Based on the following keywords and conversation snippets, generate a short, descriptive topic name for this conversation. The topic name should be a few words long and capture the main subject of the conversation.\n\nKeywords: {', '.join(keywords)}\n\nConversation Snippets:\n${"\n".join([msg['content'] for msg in messages])}"
+    topic_generation_prompt = f"Based on the following keywords and conversation snippets, generate a short, descriptive topic name for this conversation. The topic name should be a few words long and capture the main subject of the conversation.\n\nKeywords: {', '.join(keywords)}\n\nConversation Snippets:\n$" + "\n".join([msg['content'] for msg in messages])
 
-    response = client.chat.completions.create(
-        model=os.getenv("XAI_MODEL", "grok-4"),
+    response = ollama_client.chat.completions.create(
+        model="gemma:2b",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates concise topic names for conversations."},
             {"role": "user", "content": topic_generation_prompt},
@@ -454,10 +458,10 @@ def proactively_save_topics_to_memory(messages: list[dict]):
 
     # Generate a summary of the topic
     summary_prompt = f"The following are messages from a conversation. Please generate a concise summary of the key information related to the topic: '{topic_name}'."
-    summary_prompt += "\n\n---\n\n".join(relevant_messages[:5]) # Limit to 5 messages to avoid exceeding token limit
+    summary_prompt += "\n\n---" + "\n\n".join(relevant_messages[:5]) # Limit to 5 messages to avoid exceeding token limit
 
-    response = client.chat.completions.create(
-        model=os.getenv("XAI_MODEL", "grok-4"),
+    response = ollama_client.chat.completions.create(
+        model="gemma:2b",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that summarizes conversation topics."},
             {"role": "user", "content": summary_prompt},
@@ -471,10 +475,10 @@ def proactively_save_topics_to_memory(messages: list[dict]):
 Summary: {summary}
 
 Conversation Snippets:
-${"\n".join(relevant_messages)}"""
+$""" + "\n".join(relevant_messages)
     
-    snippet_response = client.chat.completions.create(
-        model=os.getenv("XAI_MODEL", "grok-4"),
+    snippet_response = ollama_client.chat.completions.create(
+        model="gemma:2b",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that extracts key information from conversations."},
             {"role": "user", "content": snippet_prompt},
@@ -491,6 +495,7 @@ ${"\n".join(relevant_messages)}"""
     
     ltm.save_memory(memory_to_save)
     logger.info({"event": "proactive_memory_topic_saved", "topic": topic_name})
+
 
 
 
