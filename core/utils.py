@@ -13,7 +13,7 @@ def make_api_call(client, model, messages, response_format=None):
             api_call_args["response_format"] = response_format
 
         response = client.chat.completions.create(**api_call_args)
-        return response.choices[0].message.content
+        return response.choices[0].message
     except Exception as e:
         logger.error(f"Error during API call: {e}")
         return None

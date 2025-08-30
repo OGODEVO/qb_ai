@@ -223,7 +223,7 @@ def proactively_save_topics_to_memory(messages: list[dict]):
             {"role": "system", "content": "You are a helpful assistant that generates concise topic names for conversations."},
             {"role": "user", "content": topic_generation_prompt},
         ],
-    ).strip('"')
+    ).content.strip('"')
 
     # Check if the topic is already in memory
     retrieved_memories = ltm.query_memory(topic_name, n_results=1)
@@ -248,7 +248,7 @@ def proactively_save_topics_to_memory(messages: list[dict]):
             {"role": "system", "content": "You are a helpful assistant that summarizes conversation topics."},
             {"role": "user", "content": summary_prompt},
         ],
-    )
+    ).content
 
     # Extract salient snippets as evidence
     snippet_prompt = f"""Given the following conversation snippets and a summary, extract the most salient sentences or short paragraphs that directly support the summary. Focus on key facts, decisions, or user preferences.
@@ -265,7 +265,7 @@ $""" + "\n".join(relevant_messages)
             {"role": "system", "content": "You are a helpful assistant that extracts key information from conversations."},
             {"role": "user", "content": snippet_prompt},
         ],
-    ).split("\n")
+    ).content.split("\n")
     
     memory_to_save = {
         "topic": topic_name,
@@ -436,11 +436,12 @@ Calling tool: `{function_name}(...)`"""
 
             # === Secondary API Call (with tool results) ===
             message_placeholder.markdown(thinking_message + " Summarizing...▌")
-            final_response = make_api_call(
+            final_response_obj = make_api_call(
                 client=client,
                 model=os.getenv("XAI_MODEL", "grok-4"),
                 messages=api_messages,
             )
+            final_response = final_response_obj.content
             message_placeholder.markdown(final_response)
             st.session_state.messages.append({"role": "assistant", "content": final_response})
 
