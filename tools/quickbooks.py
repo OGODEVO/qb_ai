@@ -244,3 +244,49 @@ def qb_query(
     except Exception as e:
         # Catch-all for other unexpected errors, including Pydantic validation
         return {"error": f"An unexpected error occurred: {str(e)}"}
+
+def get_tools() -> list[dict]:
+    """Returns the tool definition for the qb_query function."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "qb_query",
+                "description": "Query QuickBooks for financial data like expenses, revenue, and reports.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "report": {
+                            "type": "string",
+                            "enum": ["pnl", "by_category", "expenses_by_vendor", "trial_balance", "custom"],
+                            "description": "The type of report to generate."
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The start date for the report (YYYY-MM-DD)."
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The end date for the report (YYYY-MM-DD)."
+                        },
+                        "filters": {
+                            "type": "object",
+                            "properties": {
+                                "account": {"type": "string"},
+                                "vendor": {"type": "string"},
+                                "category": {"type": "string"},
+                                "search": {"type": "string"},
+                                "limit": {"type": "integer"},
+                                "group_by": {"type": "string", "enum": ["vendor", "category"]},
+                                "compare": {"type": "string", "enum": ["prior_period"]},
+                            },
+                            "description": "Optional filters to apply to the query."
+                        }
+                    },
+                    "required": ["report", "start_date", "end_date"],
+                },
+            },
+        }
+    ]

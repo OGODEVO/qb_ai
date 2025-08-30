@@ -6,13 +6,15 @@ import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 
-from tools.quickbooks import qb_query
+from tools.quickbooks import qb_query, get_tools as get_qb_tools
 from tools.browser import BrowserTool
-from tools.meta_ads import meta_ads_query
+from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from core.attention import AttentionLayer
 from core.history import save_history, load_history
 from core.memory import LongTermMemory
 from tools.prompt_manager import PromptManager
+from core.utils import make_api_call
+from core.self_correction import background_self_correction
 
 @st.cache_resource
 def get_logger():
@@ -48,192 +50,17 @@ def get_logger():
 
 logger = get_logger()
 
-def analyze_for_corrections(messages: list[dict]) -> list[dict]:
-    """Analyzes a batch of messages for user corrections."""
-    logger.info({"event": "analyzing_for_corrections", "message_count": len(messages)})
-    
-    conversation_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in messages])
-
-    system_prompt = """
-You are an AI assistant that analyzes conversations. Your task is to identify instances where the user has corrected the AI. 
-A correction is when the user explicitly or implicitly points out a mistake in the AI's previous response. 
-For each correction you find, provide the AI's incorrect statement and the user's suggested correction.
-
-Your output MUST be a JSON object with a single key, "corrections", which is a list of objects. 
-Each object in the list should have two keys: "incorrect_statement" and "suggested_correction".
-
-If the user does not provide a specific correction, you should still identify the incorrect statement, but you should return `null` for the `suggested_correction`.
-
-If no corrections are found, return an empty list.
-
-Example 1:
-Conversation:
-user: What was our revenue last month?
-assistant: Your revenue last month was $10,000.
-user: No, it was $12,000.
-Output:
-{
-    "corrections": [
-        {
-            "incorrect_statement": "Your revenue last month was $10,000.",
-            "suggested_correction": "The revenue last month was $12,000."
-        }
-    ]
-}
-
-Example 2:
-Conversation:
-user: I don't think that's right.
-assistant: I apologize for the error. Can you please provide the correct information?
-user: The correct answer is 42.
-Output:
-{
-    "corrections": [
-        {
-            "incorrect_statement": "I apologize for the error.",
-            "suggested_correction": "The correct answer is 42."
-        }
-    ]
-}
-
-Example 3:
-Conversation:
-user: That's not what I asked for.
-assistant: I see. My apologies. How can I better assist you?
-user: I wanted a summary of the document, not the full text.
-Output:
-{
-    "corrections": [
-        {
-            "incorrect_statement": "[The full text of the document]",
-            "suggested_correction": "I wanted a summary of the document."
-        }
-    ]
-}
-
-Example 4:
-Conversation:
-user: That's wrong.
-assistant: I see. Please provide me with the correct information.
-Output:
-{
-    "corrections": [
-        {
-            "incorrect_statement": "That's wrong.",
-            "suggested_correction": null
-        }
-    ]
-}
-"""
-
-    try:
-        response = client.chat.completions.create(
-            model=os.getenv("XAI_MODEL", "grok-4"),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": conversation_text},
-            ],
-            response_format={"type": "json_object"},
-        )
-        
-        result = json.loads(response.choices[0].message.content)
-        corrections = result.get("corrections", [])
-        
-        if corrections:
-            logger.info({"event": "corrections_found", "count": len(corrections), "corrections": corrections})
-        else:
-            logger.info({"event": "no_corrections_found"})
-            
-        return corrections
-
-    except Exception as e:
-        logger.error(f"Error during correction analysis: {e}")
-        return []
 
 
-def background_self_correction(messages: list[dict]):
-    """Analyzes messages for corrections and saves them to long-term memory."""
-    corrections = analyze_for_corrections(messages)
-    for correction in corrections:
-        incorrect_statement = correction["incorrect_statement"]
-        suggested_correction = correction.get("suggested_correction")
-        
-        summary = f"The user dislikes when the agent says '{incorrect_statement}'."
-        if suggested_correction:
-            summary += f" The user prefers '{suggested_correction}'."
-
-        memory = {
-            "topic": "User Correction",
-            "summary": summary,
-            "evidence": [incorrect_statement, suggested_correction],
-            "provenance": "background_self_correction"
-        }
-        
-        ltm.save_memory(memory)
-        logger.info({"event": "correction_saved_to_memory", "correction": correction})
 
 
-def proactive_improvement(topic):
-    """Placeholder for proactive improvement logic."""
-    print(f"Proactive improvement triggered for topic: {topic}")
 
-    # Generate a learning plan
-    learning_plan_prompt = f"I am an AI agent and I have identified that I am underperforming on the topic of {topic}. Please generate a learning plan for me to improve my understanding of this topic. The learning plan should be a series of steps that I can take to improve my knowledge and skills on this topic. The steps should be actionable and specific. For example, instead of saying 'Read a book on {topic}', you should say 'Search for and read the top 3 articles on {topic}'."
 
-    response = client.chat.completions.create(
-        model=os.getenv("XAI_MODEL", "grok-4"),
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that generates learning plans."},
-            {"role": "user", "content": learning_plan_prompt},
-        ],
-    )
 
-    learning_plan = response.choices[0].message.content
-    logger.info({"event": "learning_plan_generated", "plan": learning_plan})
-    st.session_state.learning_plan = learning_plan.split("\n")
-    st.session_state.learning_plan_step = 0
 
-    # Ask for user feedback on the learning plan if required
-    if require_confirmation:
-        st.session_state.waiting_for_learning_plan_feedback = True
-    else:
-        execute_learning_plan_step()
-    st.info(f"🧠 Proactive improvement: Generated a learning plan for the topic '{topic}'.")
 
-def execute_learning_plan_step():
-    """Executes the current step in the learning plan."""
-    if st.session_state.learning_plan and st.session_state.learning_plan_step < len(st.session_state.learning_plan):
-        step = st.session_state.learning_plan[st.session_state.learning_plan_step]
-        logger.info({"event": "executing_learning_plan_step", "step": step})
-        st.session_state.learning_plan_step += 1
 
-        # Use a language model to select the appropriate tool to execute the step
-        tool_selection_prompt = f"I am an AI agent and I am currently executing a learning plan. The current step is: '{step}'. Please select the appropriate tool to execute this step. Your output should be a JSON object with two keys: 'tool' and 'query'. The 'tool' key should be the name of the tool to use, and the 'query' key should be the query to pass to the tool. For example, if the step is 'Search the web for articles on financial forecasting', your output should be: {{'tool': 'browser_search', 'query': 'financial forecasting'}}."
 
-        try:
-            response = client.chat.completions.create(
-                model=os.getenv("XAI_MODEL", "grok-4"),
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant that selects tools to execute learning plan steps."},
-                    {"role": "user", "content": tool_selection_prompt},
-                ],
-                response_format={"type": "json_object"},
-            )
-
-            tool_selection = json.loads(response.choices[0].message.content)
-            logger.info({"event": "tool_selected_for_learning_step", "tool_selection": tool_selection})
-            tool_to_use = tool_selection.get("tool")
-            query = tool_selection.get("query")
-
-            # Execute the selected tool
-            if tool_to_use in available_tools:
-                function_to_call = available_tools[tool_to_use]
-                function_response = function_to_call(query)
-                logger.info({"event": "tool_executed_for_learning_step", "tool": tool_to_use, "response": function_response})
-            else:
-                logger.error({"event": "unknown_tool_for_learning_step", "tool": tool_to_use})
-        except Exception as e:
-            logger.error({"event": "error_executing_learning_plan_step", "error": str(e)})
 
 
 # --- Initialization ---
@@ -251,10 +78,10 @@ st.set_page_config(
 def load_attention_layer():
     """Load the attention layer model, cached for performance."""
     return AttentionLayer(
-        min_turns=3,
-        max_turns=8,
-        token_budget=700,
-        decay=0.85
+        min_turns=int(os.getenv("ATTENTION_MIN_TURNS", 3)),
+        max_turns=int(os.getenv("ATTENTION_MAX_TURNS", 8)),
+        token_budget=int(os.getenv("ATTENTION_TOKEN_BUDGET", 700)),
+        decay=float(os.getenv("ATTENTION_DECAY", 0.85))
     )
 
 attention_layer = load_attention_layer()
@@ -322,7 +149,7 @@ try:
     )
     ollama_client = OpenAI(
         api_key="ollama",
-        base_url="http://localhost:11434/v1",
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
     )
 except KeyError:
     st.error(
@@ -359,89 +186,11 @@ tools.extend([
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "add_to_prompt",
-            "description": "Adds a new line to the end of the agent's system prompt.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {
-                        "type": "string",
-                        "description": "The text to add to the prompt."
-                    }
-                },
-                "required": ["text"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "remove_from_prompt",
-            "description": "Removes a specific line from the agent's system prompt.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {
-                        "type": "string",
-                        "description": "The text to remove from the prompt."
-                    }
-                },
-                "required": ["text"],
-            },
-        },
-    },
 ])
 available_tools["remember_fact"] = ltm.remember_fact
-available_tools["add_to_prompt"] = prompt_manager.add_to_prompt
-available_tools["remove_from_prompt"] = prompt_manager.remove_from_prompt
 
 if "QuickBooks" in selected_tools:
-    tools.append(
-        {
-            "type": "function",
-            "function": {
-                "name": "qb_query",
-                "description": "Query QuickBooks for financial data like expenses, revenue, and reports.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "report": {
-                            "type": "string",
-                            "enum": ["pnl", "by_category", "expenses_by_vendor", "trial_balance", "custom"],
-                            "description": "The type of report to generate."
-                        },
-                        "start_date": {
-                            "type": "string",
-                            "format": "date",
-                            "description": "The start date for the report (YYYY-MM-DD)."
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "format": "date",
-                            "description": "The end date for the report (YYYY-MM-DD)."
-                        },
-                        "filters": {
-                            "type": "object",
-                            "properties": {
-                                "account": {"type": "string"},
-                                "vendor": {"type": "string"},
-                                "category": {"type": "string"},
-                                "search": {"type": "string"},
-                                "limit": {"type": "integer"},
-                                "group_by": {"type": "string", "enum": ["vendor", "category"]},
-                                "compare": {"type": "string", "enum": ["prior_period"]},
-                            },
-                            "description": "Optional filters to apply to the query."
-                        }
-                    },
-                    "required": ["report", "start_date", "end_date"],
-                },
-            },
-        }
-    )
+    tools.extend(get_qb_tools())
     available_tools["qb_query"] = qb_query
 
 if "Browser" in selected_tools:
@@ -450,52 +199,7 @@ if "Browser" in selected_tools:
     available_tools["browser_search"] = browser_tool.search
 
 if "Meta Ads" in selected_tools:
-    tools.append(
-        {
-            "type": "function",
-            "function": {
-                "name": "meta_ads_query",
-                "description": "Query Meta Ads for advertising data.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "level": {
-                            "type": "string",
-                            "enum": ["ad", "adset", "campaign", "account"],
-                            "description": "The level to aggregate results at."
-                        },
-                        "start_date": {
-                            "type": "string",
-                            "format": "date",
-                            "description": "The start date for the report (YYYY-MM-DD)."
-                        },
-                        "end_date": {
-                            "type": "string",
-                            "format": "date",
-                            "description": "The end date for the report (YYYY-MM-DD)."
-                        },
-                        "fields": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "A list of fields to retrieve."
-                        },
-                        "filters": {
-                            "type": "object",
-                            "properties": {
-                                "campaign_id": {"type": "string"},
-                                "ad_set_id": {"type": "string"},
-                                "ad_id": {"type": "string"},
-                            },
-                            "description": "Optional filters to apply to the query."
-                        }
-                    },
-                    "required": ["level", "start_date", "end_date", "fields"],
-                },
-            },
-        }
-    )
+    tools.extend(get_meta_ads_tools())
     available_tools["meta_ads_query"] = meta_ads_query
 
 
@@ -512,14 +216,14 @@ def proactively_save_topics_to_memory(messages: list[dict]):
     # Generate a topic name from the keywords
     topic_generation_prompt = f"Based on the following keywords and conversation snippets, generate a short, descriptive topic name for this conversation. The topic name should be a few words long and capture the main subject of the conversation.\n\nKeywords: {', '.join(keywords)}\n\nConversation Snippets:\n$" + "\n".join([msg['content'] for msg in messages])
 
-    response = ollama_client.chat.completions.create(
-        model="gemma:2b",
+    topic_name = make_api_call(
+        client=ollama_client,
+        model=os.getenv("OLLAMA_MODEL", "gemma:2b"),
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates concise topic names for conversations."},
             {"role": "user", "content": topic_generation_prompt},
         ],
-    )
-    topic_name = response.choices[0].message.content.strip('"')
+    ).strip('"')
 
     # Check if the topic is already in memory
     retrieved_memories = ltm.query_memory(topic_name, n_results=1)
@@ -537,14 +241,14 @@ def proactively_save_topics_to_memory(messages: list[dict]):
     summary_prompt = f"The following are messages from a conversation. Please generate a concise summary of the key information related to the topic: '{topic_name}'."
     summary_prompt += "\n\n---" + "\n\n".join(relevant_messages[:5]) # Limit to 5 messages to avoid exceeding token limit
 
-    response = ollama_client.chat.completions.create(
-        model="gemma:2b",
+    summary = make_api_call(
+        client=ollama_client,
+        model=os.getenv("OLLAMA_MODEL", "gemma:2b"),
         messages=[
             {"role": "system", "content": "You are a helpful assistant that summarizes conversation topics."},
             {"role": "user", "content": summary_prompt},
         ],
     )
-    summary = response.choices[0].message.content
 
     # Extract salient snippets as evidence
     snippet_prompt = f"""Given the following conversation snippets and a summary, extract the most salient sentences or short paragraphs that directly support the summary. Focus on key facts, decisions, or user preferences.
@@ -554,14 +258,14 @@ Summary: {summary}
 Conversation Snippets:
 $""" + "\n".join(relevant_messages)
     
-    snippet_response = ollama_client.chat.completions.create(
-        model="gemma:2b",
+    salient_snippets = make_api_call(
+        client=ollama_client,
+        model=os.getenv("OLLAMA_MODEL", "gemma:2b"),
         messages=[
             {"role": "system", "content": "You are a helpful assistant that extracts key information from conversations."},
             {"role": "user", "content": snippet_prompt},
         ],
-    )
-    salient_snippets = snippet_response.choices[0].message.content.split("\n")
+    ).split("\n")
     
     memory_to_save = {
         "topic": topic_name,
@@ -588,12 +292,7 @@ if "waiting_for_confirmation" not in st.session_state:
     st.session_state.waiting_for_confirmation = False
 if "new_instruction" not in st.session_state:
     st.session_state.new_instruction = None
-if "learning_plan" not in st.session_state:
-    st.session_state.learning_plan = None
-if "learning_plan_step" not in st.session_state:
-    st.session_state.learning_plan_step = 0
-if "waiting_for_learning_plan_feedback" not in st.session_state:
-    st.session_state.waiting_for_learning_plan_feedback = False
+
 if "messages_since_last_analysis" not in st.session_state:
     st.session_state.messages_since_last_analysis = 0
 
@@ -615,23 +314,7 @@ if st.session_state.waiting_for_confirmation:
         st.session_state.new_instruction = None
         st.error("Instruction not added.")
 
-if st.session_state.learning_plan and not st.session_state.waiting_for_learning_plan_feedback:
-    st.write("I am currently working on the following learning plan:")
-    st.write(st.session_state.learning_plan)
-    st.write(f"Current step: {st.session_state.learning_plan[st.session_state.learning_plan_step]}")
 
-if st.session_state.waiting_for_learning_plan_feedback:
-    st.write("I have generated a learning plan for myself. Please review it and let me know if you would like me to proceed.")
-    st.write(st.session_state.learning_plan)
-    if st.button("Yes, proceed with the learning plan"):
-        st.session_state.waiting_for_learning_plan_feedback = False
-        execute_learning_plan_step()
-        st.success("Learning plan approved!")
-    if st.button("No, do not proceed with the learning plan"):
-        st.session_state.waiting_for_learning_plan_feedback = False
-        st.session_state.learning_plan = None
-        st.session_state.learning_plan_step = 0
-        st.error("Learning plan rejected.")
 
 # Accept user input
 if prompt := st.chat_input("How much did we spend on advertising last month?"):
@@ -669,8 +352,11 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
             api_call_args["tools"] = tools
             api_call_args["tool_choice"] = "auto"
 
-        response = client.chat.completions.create(**api_call_args)
-        response_message = response.choices[0].message
+        response_message = make_api_call(
+            client=client,
+            model=os.getenv("XAI_MODEL", "grok-4"),
+            messages=api_messages,
+        )
         tool_calls = response_message.tool_calls
 
         # === Tool-Calling Logic ===
@@ -750,11 +436,11 @@ Calling tool: `{function_name}(...)`"""
 
             # === Secondary API Call (with tool results) ===
             message_placeholder.markdown(thinking_message + " Summarizing...▌")
-            second_response = client.chat.completions.create(
+            final_response = make_api_call(
+                client=client,
                 model=os.getenv("XAI_MODEL", "grok-4"),
                 messages=api_messages,
             )
-            final_response = second_response.choices[0].message.content
             message_placeholder.markdown(final_response)
             st.session_state.messages.append({"role": "assistant", "content": final_response})
 
@@ -796,10 +482,7 @@ Calling tool: `{function_name}(...)`"""
                                 # The new background process handles this now.
                                 pass
 
-                    underperforming_topics = attention_layer.get_underperforming_topics()
-                    if underperforming_topics:
-                        for topic in underperforming_topics:
-                            proactive_improvement(topic)
+                    
 
             # If the conversation is coherent (i.e., a suggestion was generated), evaluate it for long-term memory
             if st.session_state.attention_suggestion:
@@ -807,7 +490,7 @@ Calling tool: `{function_name}(...)`"""
                     {"role": "user", "content": prompt},
                     {"role": "assistant", "content": final_response},
                 ]
-                memory = ltm.evaluate_and_summarize_conversation(client, conversation_to_evaluate)
+                memory = ltm.evaluate_and_summarize_conversation(ollama_client, conversation_to_evaluate)
                 if memory:
                     ltm.save_memory(memory)
                     if verbose:
@@ -827,8 +510,8 @@ Calling tool: `{function_name}(...)`"""
         st.session_state.messages_since_last_analysis += 1
         logger.info(f"Messages since last analysis: {st.session_state.messages_since_last_analysis}")
 
-        if st.session_state.messages_since_last_analysis >= 20:
-            messages_to_process = st.session_state.messages[-20:]
+        if st.session_state.messages_since_last_analysis >= int(os.getenv("ANALYSIS_THRESHOLD", 20)):
+            messages_to_process = st.session_state.messages[-int(os.getenv("ANALYSIS_THRESHOLD", 20)):]
             proactively_save_topics_to_memory(messages_to_process)
-            background_self_correction(messages_to_process)
+            background_self_correction(ollama_client, ltm, messages_to_process)
             st.session_state.messages_since_last_analysis = 0

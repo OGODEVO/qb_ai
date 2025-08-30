@@ -35,6 +35,8 @@ handler.setFormatter(formatter)
 # Add the handler to the logger
 logger.addHandler(handler)
 
+from core.utils import make_api_call
+
 class LongTermMemory:
     def __init__(self, collection_name="long_term_memory"):
         """
@@ -148,7 +150,7 @@ class LongTermMemory:
                 memories.append(memory)
         return memories
 
-    def evaluate_and_summarize_conversation(self, client, conversation: list[dict]) -> str | None:
+    def evaluate_and_summarize_conversation(self, ollama_client, conversation: list[dict]) -> str | None:
         """
         Evaluates if a conversation is memorable and returns a summary if it is.
 
@@ -198,18 +200,19 @@ Output:
 {"is_memorable": true, "summary": "The Q2 sales report showed a 15% increase in revenue."}
 '''
 
-        try:
-            response = client.chat.completions.create(
-                model=os.getenv("XAI_MODEL", "grok-4"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": conversation_text},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-            )
-            
-            result = json.loads(response.choices[0].message.content)
+        response_content = make_api_call(
+            client=ollama_client,
+            model="gemma:2b",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": conversation_text},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0,
+        )
+        
+        if response_content:
+            result = json.loads(response_content)
             logger.info({"event": "memory_evaluation", "result": result})
             
             if result.get("is_memorable"):
@@ -218,14 +221,14 @@ Output:
                 # Generate a topic name from the summary
                 topic_generation_prompt = f"Based on the following summary, generate a short, descriptive topic name for this conversation. The topic name should be a few words long and capture the main subject of the conversation.\n\nSummary: {summary}"
 
-                topic_response = client.chat.completions.create(
-                    model=os.getenv("XAI_MODEL", "grok-4"),
+                topic_name = make_api_call(
+                    client=ollama_client,
+                    model="gemma:2b",
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant that generates concise topic names for conversations."},
                         {"role": "user", "content": topic_generation_prompt},
                     ],
-                )
-                topic_name = topic_response.choices[0].message.content.strip('"')
+                ).strip('"')
 
                 return {
                     "topic": topic_name,
@@ -234,9 +237,4 @@ Output:
                     "evidence": [msg['content'] for msg in conversation]
                 }
             
-            return None
-
-        except Exception as e:
-            # Log the error or handle it as needed
-            logger.error(f"Error during memory evaluation: {e}")
-            return None
+        return None

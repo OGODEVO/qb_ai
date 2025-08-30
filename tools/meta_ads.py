@@ -126,3 +126,52 @@ def meta_ads_query(
     except Exception as e:
         # Catch-all for other unexpected errors, including Pydantic validation
         return {"error": f"An unexpected error occurred: {str(e)}"}
+
+def get_tools() -> list[dict]:
+    """Returns the tool definition for the meta_ads_query function."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "meta_ads_query",
+                "description": "Query Meta Ads for advertising data.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "level": {
+                            "type": "string",
+                            "enum": ["ad", "adset", "campaign", "account"],
+                            "description": "The level to aggregate results at."
+                        },
+                        "start_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The start date for the report (YYYY-MM-DD)."
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The end date for the report (YYYY-MM-DD)."
+                        },
+                        "fields": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "A list of fields to retrieve."
+                        },
+                        "filters": {
+                            "type": "object",
+                            "properties": {
+                                "campaign_id": {"type": "string"},
+                                "ad_set_id": {"type": "string"},
+                                "ad_id": {"type": "string"},
+                            },
+                            "description": "Optional filters to apply to the query."
+                        }
+                    },
+                    "required": ["level", "start_date", "end_date", "fields"],
+                },
+            },
+        }
+    ]
