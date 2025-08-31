@@ -297,14 +297,4 @@ Calling tool: `{function_name}(...)`"""
         if st.session_state.messages_since_last_analysis >= int(os.getenv("ANALYSIS_THRESHOLD", 15)):
             messages_to_process = st.session_state.messages[-int(os.getenv("ANALYSIS_THRESHOLD", 15)):]
             background_self_correction(ollama_client, ltm, messages_to_process)
-            st.session_state.messages_since_last_analysis = 0tire conversation history (short-term)
-        save_history(st.session_state.messages)
-
-        # Proactively save topics to memory
-        st.session_state.messages_since_last_analysis += 1
-        logger.info(f"Messages since last analysis: {st.session_state.messages_since_last_analysis}")
-
-        if st.session_state.messages_since_last_analysis >= int(os.getenv("ANALYSIS_THRESHOLD", 15)):
-            messages_to_process = st.session_state.messages[-int(os.getenv("ANALYSIS_THRESHOLD", 15)):]
-            background_self_correction(ollama_client, ltm, messages_to_process)
             st.session_state.messages_since_last_analysis = 0
