@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from tools.quickbooks import qb_query, get_tools as get_qb_tools
 from tools.browser import BrowserTool
 from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
+from tools.google_calendar import get_tools as get_calendar_tools, list_events, add_event, update_event, delete_event
 from core.history import save_history, load_history
 from core.memory import LongTermMemory
 from core.utils import make_api_call, get_current_time, get_remember_fact_tool
@@ -96,6 +97,7 @@ with st.sidebar:
     use_quickbooks = st.toggle("QuickBooks", value=True)
     use_browser = st.toggle("Browser", value=True)
     use_meta_ads = st.toggle("Meta Ads", value=True)
+    use_google_calendar = st.toggle("Google Calendar", value=True)
 
 # Create a list of selected tools based on the toggle values
 selected_tools = []
@@ -105,6 +107,8 @@ if use_browser:
     selected_tools.append("Browser")
 if use_meta_ads:
     selected_tools.append("Meta Ads")
+if use_google_calendar:
+    selected_tools.append("Google Calendar")
 
 
 # --- OpenAI Client Setup ---
@@ -153,6 +157,13 @@ if "Browser" in selected_tools:
 if "Meta Ads" in selected_tools:
     tools.extend(get_meta_ads_tools())
     available_tools["meta_ads_query"] = meta_ads_query
+
+if "Google Calendar" in selected_tools:
+    tools.extend(get_calendar_tools())
+    available_tools["list_events"] = list_events
+    available_tools["add_event"] = add_event
+    available_tools["update_event"] = update_event
+    available_tools["delete_event"] = delete_event
 
 
 # --- Chat UI and Logic ---
@@ -239,9 +250,9 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
                     executed_tool_calls.add(tool_call_identifier)
                     
                     message_placeholder.markdown(
-                        f"""{thinking_message}
+                        f'''{thinking_message}
 
-Calling tool: `{function_name}(...)`"""
+Calling tool: `{function_name}(...)`'''
                     )
                     
                     function_response = function_to_call(**function_args)

@@ -21,3 +21,7 @@ logs/
 
 # Local database
 chroma_db/
+
+# Credentials
+credentials.json
+token.json
