@@ -11,7 +11,7 @@ from tools.browser import BrowserTool
 from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from core.history import save_history, load_history
 from core.memory import LongTermMemory
-from core.utils import make_api_call
+from core.utils import make_api_call, get_current_time
 from core.self_correction import background_self_correction
 
 @st.cache_resource
@@ -138,25 +138,7 @@ tools = []
 available_tools = {}
 
 # Add the remember_fact tool by default
-tools.extend([
-    {
-        "type": "function",
-        "function": {
-            "name": "remember_fact",
-            "description": "Saves a specific fact or piece of information to the agent's long-term memory. Use this when the user explicitly asks to remember something.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "fact": {
-                        "type": "string",
-                        "description": "The specific fact or piece of information to remember."
-                    }
-                },
-                "required": ["fact"],
-            },
-        },
-    },
-])
+tools.append(get_remember_fact_tool())
 available_tools["remember_fact"] = ltm.remember_fact
 
 if "QuickBooks" in selected_tools:
@@ -211,7 +193,7 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         retrieved_memories = ltm.query_memory(prompt)
 
         # Construct the system prompt with LTM if available
-        system_prompt = BASE_SYSTEM_PROMPT
+        system_prompt = BASE_SYSTEM_PROMPT.format(current_time=get_current_time())
         if retrieved_memories:
             memory_summaries = [mem.get('summary', '') for mem in retrieved_memories]
             system_prompt += "\n\n--- Relevant Memories---" + "\n".join(memory_summaries)
@@ -249,7 +231,7 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
 
                 try:
                     function_args = json.loads(tool_call.function.arguments)
-                    tool_call_identifier = f"{function_name}-{{"json.dumps(function_args, sort_keys=True)}}"
+                    tool_call_identifier = f"{function_name}-{json.dumps(function_args, sort_keys=True)}"
 
                     if tool_call_identifier in executed_tool_calls:
                         continue # Skip duplicate tool calls
@@ -306,6 +288,16 @@ Calling tool: `{function_name}(...)`"""
         # --- Post-response Actions ---
 
         # Save the entire conversation history (short-term)
+        save_history(st.session_state.messages)
+
+        # Proactively save topics to memory
+        st.session_state.messages_since_last_analysis += 1
+        logger.info(f"Messages since last analysis: {st.session_state.messages_since_last_analysis}")
+
+        if st.session_state.messages_since_last_analysis >= int(os.getenv("ANALYSIS_THRESHOLD", 15)):
+            messages_to_process = st.session_state.messages[-int(os.getenv("ANALYSIS_THRESHOLD", 15)):]
+            background_self_correction(ollama_client, ltm, messages_to_process)
+            st.session_state.messages_since_last_analysis = 0tire conversation history (short-term)
         save_history(st.session_state.messages)
 
         # Proactively save topics to memory
