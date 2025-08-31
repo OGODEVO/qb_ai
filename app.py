@@ -11,7 +11,7 @@ from tools.browser import BrowserTool
 from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from core.history import save_history, load_history
 from core.memory import LongTermMemory
-from core.utils import make_api_call, get_current_time
+from core.utils import make_api_call, get_current_time, get_remember_fact_tool
 from core.self_correction import background_self_correction
 
 @st.cache_resource
