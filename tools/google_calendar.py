@@ -29,7 +29,7 @@ def get_calendar_service():
             flow = InstalledAppFlow.from_client_secrets_file(
                 "credentials.json", SCOPES
             )
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_local_server(port=8502)
         # Save the credentials for the next run
         with open("token.json", "w") as token:
             token.write(creds.to_json())
@@ -70,14 +70,14 @@ def list_events(max_results=10):
             start = event["start"].get("dateTime", event["start"].get("date"))
             print(start, event["summary"])
 
-def add_event(summary, location, description, start_time, end_time, attendees=None):
+def add_event(summary, start_time, end_time, location=None, description=None, attendees=None):
     """Adds an event to the user's calendar."""
     service = get_calendar_service()
     if service:
         event = {
             'summary': summary,
-            'location': location,
-            'description': description,
+            'location': location if location else '',
+            'description': description if description else '',
             'start': {
                 'dateTime': start_time,
                 'timeZone': 'America/Los_Angeles',
@@ -99,15 +99,15 @@ def add_event(summary, location, description, start_time, end_time, attendees=No
         event = service.events().insert(calendarId='primary', body=event).execute()
         print(f"Event created: {event.get('htmlLink')}")
 
-def update_event(event_id, summary, location, description, start_time, end_time, attendees=None):
+def update_event(event_id, summary, start_time, end_time, location=None, description=None, attendees=None):
     """Updates an event on the user's calendar."""
     service = get_calendar_service()
     if service:
         event = service.events().get(calendarId='primary', eventId=event_id).execute()
 
         event['summary'] = summary
-        event['location'] = location
-        event['description'] = description
+        event['location'] = location if location else ''
+        event['description'] = description if description else ''
         event['start']['dateTime'] = start_time
         event['end']['dateTime'] = end_time
         event['attendees'] = attendees if attendees else []
@@ -203,5 +203,5 @@ def get_tools():
                     "required": ["event_id"],
                 },
             },
-        },
+        }
     ]
