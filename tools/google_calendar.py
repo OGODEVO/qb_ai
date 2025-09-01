@@ -47,7 +47,6 @@ def list_events(max_results=10):
     service = get_calendar_service()
     if service:
         now = datetime.datetime.utcnow().isoformat() + "Z"  # 'Z' indicates UTC time
-        print(f"Getting the upcoming {max_results} events")
         events_result = (
             service.events()
             .list(
@@ -62,13 +61,14 @@ def list_events(max_results=10):
         events = events_result.get("items", [])
 
         if not events:
-            print("No upcoming events found.")
-            return
+            return {"events": "No upcoming events found."}
 
-        # Prints the start and name of the next 10 events
+        # Collects the start and name of the next events into a list
+        event_summaries = []
         for event in events:
             start = event["start"].get("dateTime", event["start"].get("date"))
-            print(start, event["summary"])
+            event_summaries.append(f"{start} {event['summary']}")
+        return {"events": "\n".join(event_summaries)}
 
 def add_event(summary, start_time, end_time, location=None, description=None, attendees=None):
     """Adds an event to the user's calendar."""
@@ -97,7 +97,7 @@ def add_event(summary, start_time, end_time, location=None, description=None, at
         }
 
         event = service.events().insert(calendarId='primary', body=event).execute()
-        print(f"Event created: {event.get('htmlLink')}")
+        return {"status": "Event created", "link": event.get('htmlLink')}
 
 def update_event(event_id, summary, start_time, end_time, location=None, description=None, attendees=None):
     """Updates an event on the user's calendar."""
@@ -113,7 +113,7 @@ def update_event(event_id, summary, start_time, end_time, location=None, descrip
         event['attendees'] = attendees if attendees else []
 
         updated_event = service.events().update(calendarId='primary', eventId=event['id'], body=event).execute()
-        print(f"Event updated: {updated_event.get('htmlLink')}")
+        return {"status": "Event updated", "link": updated_event.get('htmlLink')}
 
 
 def delete_event(event_id):
@@ -121,7 +121,7 @@ def delete_event(event_id):
     service = get_calendar_service()
     if service:
         service.events().delete(calendarId='primary', eventId=event_id).execute()
-        print("Event deleted")
+        return {"status": "Event deleted"}
 
 def get_tools():
     return [
