@@ -89,84 +89,41 @@ def handle_chat_completion(messages, model, stream=False):
     # Prepend system prompt
     final_messages = [{"role": "system", "content": system_prompt}] + messages
 
-    # === Primary API Call ===
-    api_call_args = {
-        "model": model,
-        "messages": final_messages,
-        "stream": stream,
-    }
-    if tools:
-        api_call_args["tools"] = tools
-        api_call_args["tool_choice"] = "auto"
+    while True:
+        response_message = make_api_call(
+            client=client,
+            model=model,
+            messages=final_messages,
+            tools=tools,
+            tool_choice="auto",
+            stream=False
+        )
 
-    response_message = make_api_call(
-        client=client,
-        **api_call_args,
-    )
+        if not response_message.tool_calls:
+            return response_message
 
-    if not stream:
-        tool_calls = response_message.tool_calls
-
-        # === Tool-Calling Logic ===
-        if tool_calls:
-            final_messages.append(response_message)
-            executed_tool_calls = set()
-
-            for tool_call in tool_calls:
-                function_name = tool_call.function.name
-                function_to_call = available_tools.get(function_name)
-                
-                if not function_to_call:
-                    # In a real-world scenario, you might want to handle this more gracefully
-                    raise Exception(f"Model tried to call an unknown function: {function_name}")
-
+        final_messages.append(response_message)
+        for tool_call in response_message.tool_calls:
+            function_name = tool_call.function.name
+            function_to_call = available_tools.get(function_name)
+            if function_to_call:
                 try:
                     function_args = json.loads(tool_call.function.arguments)
-                    tool_call_identifier = f"{function_name}-{{json.dumps(function_args, sort_keys=True)}}"
-
-                    if tool_call_identifier in executed_tool_calls:
-                        continue # Skip duplicate tool calls
-                    
-                    executed_tool_calls.add(tool_call_identifier)
-                    
                     function_response = function_to_call(**function_args)
-
-                    final_messages.append(
-                        {
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": json.dumps(function_response),
-                        }
-                    )
-                except json.JSONDecodeError:
-                    # Handle JSON decoding errors
-                    raise Exception(f"Invalid arguments from model for {function_name}: {tool_call.function.arguments}")
+                    final_messages.append({
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": function_name,
+                        "content": json.dumps(function_response),
+                    })
                 except Exception as e:
-                    final_messages.append(
-                        {
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": json.dumps({"error": str(e)}),
-                        }
-                    )
+                    final_messages.append({
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": function_name,
+                        "content": json.dumps({"error": str(e)}),
+                    })
 
-            # === Secondary API Call (with tool results) ===
-            start_time = time.time()
-            final_response_obj = make_api_call(
-                client=client,
-                model=model,
-                messages=final_messages,
-                stream=stream,
-            )
-            end_time = time.time()
-            print(f"X.AI API call latency (with tools): {end_time - start_time:.2f} seconds")
-            return final_response_obj
 
-        # === Standard Response (no tool call) ===
-        else:
-            return response_message
-    else:
-        return response_message
+
 
