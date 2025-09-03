@@ -153,12 +153,15 @@ def handle_chat_completion(messages, model, stream=False):
                     )
 
             # === Secondary API Call (with tool results) ===
+            start_time = time.time()
             final_response_obj = make_api_call(
                 client=client,
                 model=model,
                 messages=final_messages,
                 stream=stream,
             )
+            end_time = time.time()
+            print(f"X.AI API call latency (with tools): {end_time - start_time:.2f} seconds")
             return final_response_obj
 
         # === Standard Response (no tool call) ===
