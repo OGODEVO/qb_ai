@@ -60,9 +60,9 @@ class ShortTermMemory:
         if not messages_to_summarize:
             return
 
-        prompt = "Summarize the following conversation:
+        prompt = """Summarize the following conversation:
 
-"
+"""
         for msg in messages_to_summarize:
             prompt += f"{msg['role']}: {msg['content']}\n"
 

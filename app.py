@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import streamlit as st
+import requests
 from dotenv import load_dotenv
 
 from core.history import save_history, load_history
@@ -74,6 +75,47 @@ with st.sidebar:
         with open(os.path.join("static", "agent_avatar.png"), "wb") as f:
             f.write(agent_avatar_file.getbuffer())
         st.session_state.agent_avatar = "static/agent_avatar.png"
+
+    st.header("Manage Tool Servers")
+
+    tool_server_url = st.text_input("openapi.json URL or Path", placeholder="http://localhost:8000/openapi.json")
+    st.markdown("WebUI will make requests to \"/openapi.json\"")
+    if st.button("Add Connection"):
+        if tool_server_url:
+            try:
+                response = requests.post("http://127.0.0.1:8000/tool_servers", json={"url": tool_server_url})
+                if response.status_code == 200:
+                    st.success("Tool server added successfully!")
+                else:
+                    st.error(f"Failed to add tool server: {response.text}")
+            except requests.exceptions.RequestException as e:
+                st.error(f"Failed to connect to the API: {e}")
+        else:
+            st.warning("Please enter a tool server URL.")
+
+    st.subheader("Connected Tool Servers")
+    try:
+        response = requests.get("http://127.0.0.1:8000/tool_servers")
+        if response.status_code == 200:
+            tool_servers = response.json()
+            for i, server in enumerate(tool_servers):
+                col1, col2 = st.columns([0.8, 0.2])
+                with col1:
+                    st.text(server['url'])
+                with col2:
+                    if st.button(f"Delete##{i}"):
+                        try:
+                            delete_response = requests.delete(f"http://127.0.0.1:8000/tool_servers/{i}")
+                            if delete_response.status_code == 200:
+                                st.success("Tool server removed successfully!")
+                            else:
+                                st.error(f"Failed to remove tool server: {delete_response.text}")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"Failed to connect to the API: {e}")
+        else:
+            st.error("Failed to fetch tool servers.")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to connect to the API: {e}")
 
     user_avatar = st.session_state.get("user_avatar", "🧑‍💻")
     agent_avatar = st.session_state.get("agent_avatar", "🤖")

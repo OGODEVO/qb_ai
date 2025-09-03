@@ -69,7 +69,7 @@ def get_tools_and_available_functions():
     
     return tools, available_tools
 
-def handle_chat_completion(short_term_memory: ShortTermMemory, model: str):
+def handle_chat_completion(short_term_memory: ShortTermMemory, model: str, stream: bool = False):
     """Handles the chat completion logic."""
     tools, available_tools = get_tools_and_available_functions()
 
@@ -91,42 +91,66 @@ def handle_chat_completion(short_term_memory: ShortTermMemory, model: str):
     # Prepend system prompt
     final_messages = [{"role": "system", "content": system_prompt}] + messages
 
-    while True:
-        response_message = make_api_call(
-            client=client,
-            model=model,
-            messages=final_messages,
-            tools=tools,
-            tool_choice="auto"
-        )
+    if stream:
+        def stream_generator():
+            stream_response = make_api_call(
+                client=client,
+                model=model,
+                messages=final_messages,
+                tools=tools,
+                tool_choice="auto",
+                stream=True
+            )
+            for chunk in stream_response:
+                yield chunk.choices[0].delta.content or ""
+        return stream_generator()
 
-        if not response_message.tool_calls:
-            return response_message
+    response_message = make_api_call(
+        client=client,
+        model=model,
+        messages=final_messages,
+        tools=tools,
+        tool_choice="auto"
+    )
 
-        final_messages.append(response_message)
-        short_term_memory.add_message(response_message.role, response_message.content)
+    if not response_message.tool_calls:
+        return response_message
 
-        for tool_call in response_message.tool_calls:
-            function_name = tool_call.function.name
-            function_to_call = available_tools.get(function_name)
-            if function_to_call:
-                try:
-                    function_args = json.loads(tool_call.function.arguments)
-                    function_response = function_to_call(**function_args)
-                    tool_response_content = json.dumps(function_response)
-                    final_messages.append({
-                        "tool_call_id": tool_call.id,
-                        "role": "tool",
-                        "name": function_name,
-                        "content": tool_response_content,
-                    })
-                    short_term_memory.add_message("tool", tool_response_content)
-                except Exception as e:
-                    error_content = json.dumps({"error": str(e)})
-                    final_messages.append({
-                        "tool_call_id": tool_call.id,
-                        "role": "tool",
-                        "name": function_name,
-                        "content": error_content,
-                    })
-                    short_term_memory.add_message("tool", error_content)
+    final_messages.append(response_message)
+    # short_term_memory.add_message(response_message.role, response_message.content)
+
+    for tool_call in response_message.tool_calls:
+        function_name = tool_call.function.name
+        function_to_call = available_tools.get(function_name)
+        if function_to_call:
+            try:
+                function_args = json.loads(tool_call.function.arguments)
+                function_response = function_to_call(**function_args)
+                tool_response_content = json.dumps(function_response)
+                final_messages.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": tool_response_content,
+                })
+                # short_term_memory.add_message("tool", tool_response_content)
+            except Exception as e:
+                error_content = json.dumps({"error": str(e)})
+                final_messages.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": error_content,
+                })
+                # short_term_memory.add_message("tool", error_content)
+
+    # Second API call to get the final response from the assistant
+    final_response = make_api_call(
+        client=client,
+        model=model,
+        messages=final_messages,
+        tools=tools,
+        tool_choice="auto"
+    )
+
+    return final_response
