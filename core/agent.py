@@ -1,4 +1,3 @@
-
 import os
 import json
 import time
@@ -10,6 +9,7 @@ from tools.browser import BrowserTool
 from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from tools.google_calendar import get_tools as get_calendar_tools, list_events, add_event, update_event, delete_event
 from core.memory import LongTermMemory
+from core.short_term_memory import ShortTermMemory
 from core.utils import make_api_call, get_current_time, get_remember_fact_tool
 
 # --- Initialization ---
@@ -69,9 +69,11 @@ def get_tools_and_available_functions():
     
     return tools, available_tools
 
-def handle_chat_completion(messages, model, stream=False):
+def handle_chat_completion(short_term_memory: ShortTermMemory, model: str):
     """Handles the chat completion logic."""
     tools, available_tools = get_tools_and_available_functions()
+
+    messages = short_term_memory.get_history()
 
     # Query long-term memory
     last_user_message = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), None)
@@ -95,14 +97,15 @@ def handle_chat_completion(messages, model, stream=False):
             model=model,
             messages=final_messages,
             tools=tools,
-            tool_choice="auto",
-            stream=False
+            tool_choice="auto"
         )
 
         if not response_message.tool_calls:
             return response_message
 
         final_messages.append(response_message)
+        short_term_memory.add_message(response_message.role, response_message.content)
+
         for tool_call in response_message.tool_calls:
             function_name = tool_call.function.name
             function_to_call = available_tools.get(function_name)
@@ -110,20 +113,20 @@ def handle_chat_completion(messages, model, stream=False):
                 try:
                     function_args = json.loads(tool_call.function.arguments)
                     function_response = function_to_call(**function_args)
+                    tool_response_content = json.dumps(function_response)
                     final_messages.append({
                         "tool_call_id": tool_call.id,
                         "role": "tool",
                         "name": function_name,
-                        "content": json.dumps(function_response),
+                        "content": tool_response_content,
                     })
+                    short_term_memory.add_message("tool", tool_response_content)
                 except Exception as e:
+                    error_content = json.dumps({"error": str(e)})
                     final_messages.append({
                         "tool_call_id": tool_call.id,
                         "role": "tool",
                         "name": function_name,
-                        "content": json.dumps({"error": str(e)}),
+                        "content": error_content,
                     })
-
-
-
-
+                    short_term_memory.add_message("tool", error_content)

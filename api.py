@@ -1,14 +1,14 @@
 import os
 import json
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
+
 from pydantic import BaseModel
 from typing import Literal
 from dotenv import load_dotenv
 from fastapi_mcp import FastApiMCP
 
 from core.agent import handle_chat_completion
-from core.history import load_history, save_history
+from core.short_term_memory import ShortTermMemory
 
 # --- Initialization ---
 load_dotenv(override=True)
@@ -36,7 +36,6 @@ async def list_models():
 class ChatCompletionRequest(BaseModel):
     messages: list
     model: str
-    stream: bool = False
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
@@ -44,7 +43,19 @@ async def chat_completions(request: ChatCompletionRequest):
     OpenAI-compatible chat completion endpoint.
     """
     try:
-        response_message = handle_chat_completion(request.messages, request.model, request.stream)
+        # Initialize short-term memory with logging
+        short_term_memory = ShortTermMemory(log_file="conversation_log.json")
+
+        # Populate short-term memory from the request
+        for message in request.messages:
+            short_term_memory.add_message(message["role"], message["content"])
+
+        response_message = handle_chat_completion(short_term_memory, request.model)
+        
+        # Add the assistant's response to the memory
+        if response_message.content:
+            short_term_memory.add_message("assistant", response_message.content)
+
         return {
             "choices": [{
                 "index": 0,

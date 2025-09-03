@@ -25,3 +25,4 @@ chroma_db/
 # Credentials
 credentials.json
 token.json
+/.devcontainer

@@ -1,3 +1,6 @@
+# DEPRECATED: This module is deprecated and will be removed in a future version.
+# The functionality has been replaced by the ShortTermMemory class in core/short_term_memory.py
+
 import json
 import os
 from datetime import datetime, timedelta
@@ -44,3 +47,21 @@ def load_history() -> list[dict]:
             return history.get("messages", [])
     except (json.JSONDecodeError, FileNotFoundError):
         return []
+
+
+def clear_history():
+    """
+    Deletes the chat history file.
+    """
+    if os.path.exists(HISTORY_FILE):
+        os.remove(HISTORY_FILE)
+        print("Chat history cleared.")
+    else:
+        print("No chat history to clear.")
+        
+def get_history():
+    """
+    This is a placeholder for a more robust history retrieval function.
+    For now, it simply loads the history from the JSON file.
+    """
+    return load_history()
