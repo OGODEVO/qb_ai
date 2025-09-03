@@ -70,12 +70,4 @@ mcp.mount()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)e=500, detail=str(e))
-
-# --- MCP Server ---
-mcp = FastApiMCP(app, name="Reki", description="An agent that can answer questions about QuickBooks, Meta Ads, and Google Calendar.")
-mcp.mount()
-
-if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
