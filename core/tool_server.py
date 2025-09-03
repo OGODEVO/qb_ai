@@ -2,7 +2,7 @@ import json
 import os
 from typing import Dict, List
 import requests
-import requests
+
 
 TOOL_SERVER_CONFIG_FILE = "tool_servers.json"
 
