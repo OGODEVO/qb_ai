@@ -1,5 +1,7 @@
 import os
+import json
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Literal
 from dotenv import load_dotenv
@@ -41,24 +43,30 @@ async def chat_completions(request: ChatCompletionRequest):
     OpenAI-compatible chat completion endpoint.
     """
     try:
-        response_message = handle_chat_completion(request.messages, request.model, request.stream)
-        
-        return {
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": response_message.content,
-                },
-                "finish_reason": "stop",
-            }],
-            "model": request.model,
-            "usage": {
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0,
+        if request.stream:
+            async def stream_generator():
+                response_stream = handle_chat_completion(request.messages, request.model, request.stream)
+                for chunk in response_stream:
+                    yield f"data: {json.dumps(chunk.dict())}\n\n"
+            return StreamingResponse(stream_generator(), media_type="text/event-stream")
+        else:
+            response_message = handle_chat_completion(request.messages, request.model, request.stream)
+            return {
+                "choices": [{
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": response_message.content,
+                    },
+                    "finish_reason": "stop",
+                }],
+                "model": request.model,
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                }
             }
-        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
