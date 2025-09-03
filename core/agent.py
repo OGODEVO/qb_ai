@@ -69,7 +69,7 @@ def get_tools_and_available_functions():
     
     return tools, available_tools
 
-def handle_chat_completion(short_term_memory: ShortTermMemory, model: str, stream: bool = False):
+def handle_chat_completion(short_term_memory: ShortTermMemory, model: str):
     """Handles the chat completion logic."""
     tools, available_tools = get_tools_and_available_functions()
 
@@ -91,19 +91,7 @@ def handle_chat_completion(short_term_memory: ShortTermMemory, model: str, strea
     # Prepend system prompt
     final_messages = [{"role": "system", "content": system_prompt}] + messages
 
-    if stream:
-        def stream_generator():
-            stream_response = make_api_call(
-                client=client,
-                model=model,
-                messages=final_messages,
-                tools=tools,
-                tool_choice="auto",
-                stream=True
-            )
-            for chunk in stream_response:
-                yield chunk.choices[0].delta.content or ""
-        return stream_generator()
+    
 
     response_message = make_api_call(
         client=client,

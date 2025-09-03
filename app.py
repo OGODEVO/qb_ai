@@ -155,8 +155,12 @@ if prompt := st.chat_input("How much did we spend on advertising last month?"):
         message_placeholder.markdown(thinking_message + "▌")
 
         try:
+            short_term_memory = ShortTermMemory()
+            for message in st.session_state.messages:
+                short_term_memory.add_message(message["role"], message["content"])
+
             response_message = handle_chat_completion(
-                st.session_state.messages,
+                short_term_memory,
                 os.getenv("XAI_MODEL", "grok-4")
             )
             final_response = response_message.content

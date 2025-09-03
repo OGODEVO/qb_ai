@@ -1,7 +1,7 @@
 import os
 import json
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
+
 from pydantic import BaseModel
 from typing import Literal
 from dotenv import load_dotenv
@@ -37,7 +37,6 @@ async def list_models():
 class ChatCompletionRequest(BaseModel):
     messages: list
     model: str
-    stream: bool = True
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
@@ -52,31 +51,28 @@ async def chat_completions(request: ChatCompletionRequest):
         for message in request.messages:
             short_term_memory.add_message(message["role"], message["content"])
 
-        if request.stream:
-            return StreamingResponse(handle_chat_completion(short_term_memory, request.model, request.stream), media_type="application/x-ndjson")
-        else:
-            response_message = handle_chat_completion(short_term_memory, request.model, request.stream)
-            
-            # Add the assistant's response to the memory
-            if response_message.content:
-                short_term_memory.add_message("assistant", response_message.content)
+        response_message = handle_chat_completion(short_term_memory, request.model)
+        
+        # Add the assistant's response to the memory
+        if response_message.content:
+            short_term_memory.add_message("assistant", response_message.content)
 
-            return {
-                "choices": [{
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": response_message.content,
-                    },
-                    "finish_reason": "stop",
-                }],
-                "model": request.model,
-                "usage": {
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": 0,
-                }
+        return {
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": response_message.content,
+                },
+                "finish_reason": "stop",
+            }],
+            "model": request.model,
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
             }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
