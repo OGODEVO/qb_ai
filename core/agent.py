@@ -16,11 +16,11 @@ from core.utils import make_api_call, get_current_time, get_remember_fact_tool
 load_dotenv(override=True)
 
 # --- Load Models and Tools ---
-def load_long_term_memory():
-    """Load the long-term memory store."""
-    return LongTermMemory()
+# def load_long_term_memory():
+#     """Load the long-term memory store."""
+#     return LongTermMemory()
 
-ltm = load_long_term_memory()
+# ltm = load_long_term_memory()
 
 try:
     client = AsyncOpenAI(
@@ -46,9 +46,9 @@ def get_tools_and_available_functions():
     tools = []
     available_tools = {}
 
-    # Add the remember_fact tool by default
-    tools.append(get_remember_fact_tool())
-    available_tools["remember_fact"] = ltm.remember_fact
+    # # Add the remember_fact tool by default
+    # tools.append(get_remember_fact_tool())
+    # available_tools["remember_fact"] = ltm.remember_fact
 
     # TODO: Make tool selection dynamic based on request
     tools.extend(get_qb_tools())
@@ -75,21 +75,22 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
 
     messages = short_term_memory.get_history()
 
-    # Query long-term memory
-    last_user_message = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), None)
-    if last_user_message:
-        retrieved_memories = ltm.query_memory(last_user_message)
-    else:
-        retrieved_memories = []
+    # # Query long-term memory
+    # last_user_message = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), None)
+    # if last_user_message:
+    #     retrieved_memories = ltm.query_memory(last_user_message)
+    # else:
+    #     retrieved_memories = []
 
     # Construct the system prompt with LTM if available
     system_prompt = BASE_SYSTEM_PROMPT.format(current_time=get_current_time())
-    if retrieved_memories:
-        memory_summaries = [mem.get('summary', '') for mem in retrieved_memories]
-        system_prompt += "\n\n--- Relevant Memories---" + "\n".join(memory_summaries)
+    # if retrieved_memories:
+    #     memory_summaries = [mem.get('summary', '') for mem in retrieved_memories]
+    #     system_prompt += "\n\n--- Relevant Memories---" + "\n".join(memory_summaries)
 
     # Prepend system prompt
     final_messages = [{"role": "system", "content": system_prompt}] + messages
+
 
     if stream:
         async for chunk in stream_generator(client, model, final_messages, tools, available_tools):

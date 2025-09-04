@@ -1,6 +1,7 @@
 import os
 import json
-from fastapi import FastAPI, HTTPException, StreamingResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi_mcp import FastApiMCP
