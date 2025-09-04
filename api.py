@@ -1,5 +1,6 @@
 import os
 import json
+import sentry_sdk
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -12,7 +13,24 @@ from core.tool_server import get_tool_servers, add_tool_server, remove_tool_serv
 
 # --- Initialization ---
 load_dotenv(override=True)
+
+sentry_sdk.init(
+    dsn="https://325f84944219c5cee5d3988ace3e08ac @o4509962219028480.ingest.us.sentry.io/4509962220470272",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+    # Enable sending logs to Sentry
+    enable_logs=True,
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for tracing.
+    traces_sample_rate=1.0,
+)
+
 app = FastAPI()
+
+@app.get("/sentry-debug")
+async def trigger_error():
+    division_by_zero = 1 / 0
 
 @app.get("/v1/models")
 async def list_models():
