@@ -1,26 +1,21 @@
 import os
 import json
-from fastapi import FastAPI, Request, HTTPException
-
+from fastapi import FastAPI, HTTPException, StreamingResponse
 from pydantic import BaseModel
-from typing import Literal
 from dotenv import load_dotenv
-import requests
 from fastapi_mcp import FastApiMCP
 
 from core.agent import handle_chat_completion
 from core.short_term_memory import ShortTermMemory
+from core.tool_server import get_tool_servers, add_tool_server, remove_tool_server
 
 # --- Initialization ---
 load_dotenv(override=True)
-
 app = FastAPI()
 
 @app.get("/v1/models")
 async def list_models():
-    """
-    OpenAI-compatible models endpoint.
-    """ 
+    """OpenAI-compatible models endpoint."""
     return {
         "data": [
             {
@@ -37,46 +32,59 @@ async def list_models():
 class ChatCompletionRequest(BaseModel):
     messages: list
     model: str
+    stream: bool = True
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
-    """
-    OpenAI-compatible chat completion endpoint.
-    """
     try:
-        # Initialize short-term memory with logging
         short_term_memory = ShortTermMemory(log_file="conversation_log.json")
 
         # Populate short-term memory from the request
         for message in request.messages:
             short_term_memory.add_message(message["role"], message["content"])
 
-        response_message = handle_chat_completion(short_term_memory, request.model)
-        
-        # Add the assistant's response to the memory
-        if response_message.content:
-            short_term_memory.add_message("assistant", response_message.content)
+        if request.stream:
+            async def stream_generator():
+                async for chunk in handle_chat_completion(short_term_memory, request.model, request.stream):
+                    if chunk.choices[0].delta.content:
+                        data = {
+                            "choices": [{"delta": {"content": chunk.choices[0].delta.content}}],
+                            "model": request.model
+                        }
+                        yield f"data: {json.dumps(data)}\n\n"
+                yield "data: [DONE]\n\n"
 
-        return {
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": response_message.content,
-                },
-                "finish_reason": "stop",
-            }],
-            "model": request.model,
-            "usage": {
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0,
+            return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+        else:
+            response_generator = handle_chat_completion(short_term_memory, request.model, request.stream)
+            response = await anext(response_generator, None)
+
+            if not response:
+                 raise HTTPException(status_code=500, detail="Agent did not produce a response.")
+
+            content = response.choices[0].message.content if response.choices else ""
+
+            if content:
+                short_term_memory.add_message("assistant", content)
+
+            return {
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": content},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "model": request.model,
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                }
             }
-        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-from core.tool_server import get_tool_servers, add_tool_server, remove_tool_server
 
 # --- Tool Server Management ---
 class ToolServerRequest(BaseModel):
