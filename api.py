@@ -21,6 +21,9 @@ sentry_sdk.init(
     send_default_pii=True,
     # Enable sending logs to Sentry
     enable_logs=True,
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for tracing.
+    traces_sample_rate=1.0,
 )
 
 app = FastAPI()
