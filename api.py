@@ -38,7 +38,7 @@ async def list_models():
     return {
         "data": [
             {
-                "id": "grok-4",
+                "id": "grok-3-fast",
                 "object": "model",
                 "created": 1677610602,
                 "owned_by": "xai"
