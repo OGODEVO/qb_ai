@@ -7,6 +7,10 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi_mcp import FastApiMCP
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from agent1.agent import handle_chat_completion
 from agent1.short_term_memory import ShortTermMemory
 from agent1.tool_server import get_tool_servers, add_tool_server, remove_tool_server
