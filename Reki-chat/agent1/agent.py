@@ -4,8 +4,8 @@ from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 from .tools import get_tools_and_available_functions
-from ..short_term_memory import ShortTermMemory
-from ..utils import make_api_call, get_current_time
+from .short_term_memory import ShortTermMemory
+from .utils import make_api_call, get_current_time
 
 # --- Initialization ---
 load_dotenv(override=True)
@@ -24,10 +24,10 @@ except KeyError:
 
 # --- System Prompt ---
 try:
-    with open("prompts/system.txt", "r") as f:
+    with open("agent1/prompt.txt", "r") as f:
         BASE_SYSTEM_PROMPT = f.read()
 except FileNotFoundError:
-    raise RuntimeError("System prompt file not found at 'prompts/system.txt'.")
+    raise RuntimeError("System prompt file not found at 'agent1/prompt.txt'.")
 
 async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str, stream: bool = False):
     """Handles the chat completion logic."""

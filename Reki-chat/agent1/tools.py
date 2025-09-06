@@ -2,7 +2,7 @@ from tools.quickbooks import qb_query, get_tools as get_qb_tools
 from tools.browser import BrowserTool
 from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from tools.google_calendar import get_tools as get_calendar_tools, list_events, add_event, update_event, delete_event
-from ..utils import get_remember_fact_tool
+from .utils import get_remember_fact_tool
 
 def get_tools_and_available_functions():
     """Get the tools and available functions."""
