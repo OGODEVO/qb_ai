@@ -6,6 +6,13 @@ from .utils import get_remember_fact_tool
 from .tool_server import get_tool_servers
 import requests
 
+def make_remote_tool(url):
+    def remote_tool(**kwargs):
+        res = requests.post(url, json=kwargs)
+        res.raise_for_status()
+        return res.json()
+    return remote_tool
+
 def get_tools_and_available_functions():
     """Get the tools and available functions."""
     tools = []
@@ -42,12 +49,6 @@ def get_tools_and_available_functions():
                 tools.extend(server_tools["tools"])
             if "available_tools" in server_tools:
                 for func_name, func_url in server_tools["available_tools"].items():
-                    def make_remote_tool(url):
-                        def remote_tool(**kwargs):
-                            res = requests.post(url, json=kwargs)
-                            res.raise_for_status()
-                            return res.json()
-                        return remote_tool
                     available_tools[func_name] = make_remote_tool(func_url)
         except Exception as e:
             print(f"Error loading tools from server {server['url']}: {e}")
