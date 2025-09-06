@@ -4,6 +4,7 @@ import uuid
 import logging
 import chromadb
 from datetime import datetime
+from openai import OpenAI
 
 # Configure logging
 log_dir = 'logs'
@@ -35,7 +36,7 @@ handler.setFormatter(formatter)
 # Add the handler to the logger
 logger.addHandler(handler)
 
-from core.utils import make_api_call
+from .utils import make_api_call
 
 class LongTermMemory:
     def __init__(self, collection_name="long_term_memory"):
@@ -58,6 +59,14 @@ class LongTermMemory:
             database=database
         )
         self.collection = self.client.get_or_create_collection(name=collection_name)
+        try:
+            self.ollama_client = OpenAI(
+                api_key="ollama",
+                base_url="http://localhost:11434/v1",
+            )
+        except Exception as e:
+            print(f"Failed to initialize Ollama client: {e}")
+            self.ollama_client = None
 
     def save_memory(self, memory: dict):
         """
@@ -150,12 +159,41 @@ class LongTermMemory:
                 memories.append(memory)
         return memories
 
-    def evaluate_and_summarize_conversation(self, ollama_client, conversation: list[dict]) -> str | None:
+    def summarize_conversation(self, messages_to_summarize):
+        """
+        Summarizes the oldest part of the conversation.
+        """
+        if not self.ollama_client:
+            print("Cannot summarize conversation, Ollama client not available.")
+            return None
+
+        if not messages_to_summarize:
+            return None
+
+        prompt = """
+Summarize the following conversation:
+
+"""
+        for msg in messages_to_summarize:
+            prompt += f"{msg['role']}: {msg['content']}\n"
+
+        try:
+            response = self.ollama_client.chat.completions.create(
+                model="gemma:2b",
+                messages=[{"role": "system", "content": prompt}],
+                max_tokens=150,
+            )
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            print(f"Error during summarization: {e}")
+            return None
+
+    def evaluate_and_summarize_conversation(self, conversation: list[dict]) -> str | None:
         """
         Evaluates if a conversation is memorable and returns a summary if it is.
 
         Args:
-            client: The OpenAI client instance.
             conversation (list[dict]): The recent conversation turns.
 
         Returns:
@@ -201,7 +239,7 @@ Output:
 '''
 
         response_content = make_api_call(
-            client=ollama_client,
+            client=self.ollama_client,
             model="gemma:2b",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -222,7 +260,7 @@ Output:
                 topic_generation_prompt = f"Based on the following summary, generate a short, descriptive topic name for this conversation. The topic name should be a few words long and capture the main subject of the conversation.\n\nSummary: {summary}"
 
                 topic_name = make_api_call(
-                    client=ollama_client,
+                    client=self.ollama_client,
                     model="gemma:2b",
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant that generates concise topic names for conversations."},

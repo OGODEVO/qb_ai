@@ -7,9 +7,9 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi_mcp import FastApiMCP
 
-from core.agent import handle_chat_completion
-from core.short_term_memory import ShortTermMemory
-from core.tool_server import get_tool_servers, add_tool_server, remove_tool_server
+from agents.sample_agent.agent import handle_chat_completion
+from agents.short_term_memory import ShortTermMemory
+from agents.tool_server import get_tool_servers, add_tool_server, remove_tool_server
 
 # --- Initialization ---
 load_dotenv(override=True)
