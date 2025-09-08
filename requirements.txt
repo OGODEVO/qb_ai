@@ -20,3 +20,5 @@ fastapi
 uvicorn
 fastapi-mcp
 sentry-sdk[fastapi]
+docling
+nltk
