@@ -42,7 +42,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "process_document",
-                "description": "Processes a document from a file path and returns its content.",
+                "description": "Processes a document from a given file path by converting it into a clean Markdown format. This tool is useful for extracting text and structure from various document types (like PDF, DOCX, etc.) for further analysis or processing.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -59,7 +59,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "suggest_metadata",
-                "description": "Suggests metadata and tags for a given document content.",
+                "description": "Analyzes the provided document content and suggests relevant metadata, including a concise title, a set of descriptive tags (keywords), and a brief summary. This is useful for cataloging, organizing, and enabling efficient retrieval of documents.",
                 "parameters": {
                     "type": "object",
                     "properties": {
