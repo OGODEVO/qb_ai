@@ -103,3 +103,47 @@ def find_similar_documents(query: str, top_k: int = 3) -> list:
             })
 
     return similar_chunks
+
+
+def get_tools():
+    """Returns the tools for the document handler."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "process_document_and_store_in_db",
+                "description": "Processes a document from a file path, chunks it, creates embeddings, and stores it in the 'rag' ChromaDB collection.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "The path to the document file."
+                        }
+                    },
+                    "required": ["file_path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "find_similar_documents",
+                "description": "Finds similar document chunks in the 'rag' collection based on a query.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The query to search for."
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "The number of similar chunks to return."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }
+    ]
