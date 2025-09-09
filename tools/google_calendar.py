@@ -134,7 +134,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "list_events",
-                "description": "Lists the next events on the user's calendar.",
+                "description": "Lists upcoming events from the user's primary Google Calendar, ordered by start time.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -152,7 +152,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "add_event",
-                "description": "Adds an event to the user's calendar.",
+                "description": "Adds a new event to the user's primary Google Calendar. Requires a summary (title), start time, and end time.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -175,16 +175,16 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "update_event",
-                "description": "Updates an event on the user's calendar.",
+                "description": "Updates an existing event on the user's primary Google Calendar. Requires the event ID and the new details for the event.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "event_id": {"type": "string", "description": "The ID of the event to update."},
+                        "event_id": {"type": "string", "description": "The ID of a given event to update."}, 
                         "summary": {"type": "string", "description": "The new summary or title of the event."},
                         "location": {"type": "string", "description": "The new location of the event."},
                         "description": {"type": "string", "description": "The new description of the event."},
-                        "start_time": {"type": "string", "description": "The new start time of the event in ISO 8601 format."}, 
-                        "end_time": {"type": "string", "description": "The new end time of the event in ISO 8601 format."}, 
+                        "start_time": {"type": "string", "description": "The new start time of the event in ISO 8601 format."},
+                        "end_time": {"type": "string", "description": "The new end time of the event in ISO 8601 format."},
                         "attendees": {
                             "type": "array",
                             "items": {"type": "string"},
@@ -199,7 +199,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "delete_event",
-                "description": "Deletes an event from the user's calendar.",
+                "description": "Deletes an event from the user's primary Google Calendar, given an event ID.",
                 "parameters": {
                     "type": "object",
                     "properties": {
