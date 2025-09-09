@@ -1,4 +1,5 @@
 import datetime
+import os
 import os.path
 
 from google.auth.transport.requests import Request
@@ -10,6 +11,11 @@ from googleapiclient.errors import HttpError
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
+# Get the directory of the current script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+TOKEN_PATH = os.path.join(SCRIPT_DIR, 'token.json')
+CREDENTIALS_PATH = os.path.join(SCRIPT_DIR, 'credentials.json')
+
 
 def get_calendar_service():
     """Shows basic usage of the Google Calendar API.
@@ -19,19 +25,19 @@ def get_calendar_service():
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    if os.path.exists(TOKEN_PATH):
+        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json", SCOPES
+                CREDENTIALS_PATH, SCOPES
             )
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_console()
         # Save the credentials for the next run
-        with open("token.json", "w") as token:
+        with open(TOKEN_PATH, "w") as token:
             token.write(creds.to_json())
 
     try:
@@ -115,7 +121,6 @@ def update_event(event_id, summary, start_time, end_time, location=None, descrip
         updated_event = service.events().update(calendarId='primary', eventId=event['id'], body=event).execute()
         return {"status": "Event updated", "link": updated_event.get('htmlLink')}
 
-
 def delete_event(event_id):
     """Deletes an event from the user's calendar."""
     service = get_calendar_service()
@@ -178,8 +183,8 @@ def get_tools():
                         "summary": {"type": "string", "description": "The new summary or title of the event."},
                         "location": {"type": "string", "description": "The new location of the event."},
                         "description": {"type": "string", "description": "The new description of the event."},
-                        "start_time": {"type": "string", "description": "The new start time of the event in ISO 8601 format."},
-                        "end_time": {"type": "string", "description": "The new end time of the event in ISO 8601 format."},
+                        "start_time": {"type": "string", "description": "The new start time of the event in ISO 8601 format."}, 
+                        "end_time": {"type": "string", "description": "The new end time of the event in ISO 8601 format."}, 
                         "attendees": {
                             "type": "array",
                             "items": {"type": "string"},
@@ -198,7 +203,7 @@ def get_tools():
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "event_id": {"type": "string", "description": "The ID of the event to delete."}
+                        "event_id": {"type": "string", "description": "The ID of the event to delete."} 
                     },
                     "required": ["event_id"],
                 },
