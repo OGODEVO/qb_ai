@@ -94,8 +94,21 @@ def vectorize_and_store_document(document_content: str, metadata: dict) -> str:
         model = SentenceTransformer('all-MiniLM-L6-v2')
 
         # Initialize the ChromaDB client
-        client = chromadb.Client()
+        try:
+            api_key = os.environ["CHROMA_API_KEY"]
+            tenant = os.environ["CHROMA_TENANT"]
+            database = os.environ["CHROMA_DATABASE"]
+        except KeyError:
+            raise ConnectionError(
+                "ChromaDB Cloud credentials not found. Please set CHROMA_API_KEY, "
+                "CHROMA_TENANT, and CHROMA_DATABASE in your environment variables."
+            )
 
+        client = chromadb.CloudClient(
+            api_key=api_key,
+            tenant=tenant,
+            database=database
+        )
         # Get or create a collection
         collection = client.get_or_create_collection("documents")
 
