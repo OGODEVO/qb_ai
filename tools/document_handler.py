@@ -96,7 +96,9 @@ def vectorize_and_store_document(document_content: str, metadata: dict) -> str:
         # Initialize the ChromaDB client
         client = chromadb.HttpClient(
             host="https://api.trychroma.com",
-            headers={"Authorization": f"Bearer {os.environ['CHROMA_API_KEY']}"}
+            headers={"Authorization": f"Bearer {os.environ['CHROMA_API_KEY']}"},
+            tenant=os.environ.get("CHROMA_TENANT", "default"),
+            database=os.environ.get("CHROMA_DATABASE", "default")
         )
 
         # Get or create a collection
