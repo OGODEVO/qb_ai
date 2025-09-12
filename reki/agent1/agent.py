@@ -3,9 +3,14 @@ import json
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
+from collections import namedtuple
 from .tools import get_tools_and_available_functions
 from .short_term_memory import ShortTermMemory
 from .utils import make_api_call, get_current_time
+
+# Mock objects to wrap messages for API compatibility
+Choice = namedtuple('Choice', ['message'])
+Completion = namedtuple('Completion', ['choices'])
 
 # --- Initialization ---
 load_dotenv(override=True)
@@ -54,7 +59,7 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
     )
 
     if not response_message.tool_calls:
-        yield response_message
+        yield Completion(choices=[Choice(message=response_message)])
         return
 
     final_messages.append(response_message)

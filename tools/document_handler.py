@@ -130,7 +130,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "process_document",
-                "description": "Processes a document from a given file path by converting it into a clean Markdown format. This tool is useful for extracting text and structure from various document types (like PDF, DOCX, etc.) for further analysis or processing.",
+                "description": "Reads a document from a local file path and converts it into a clean Markdown format. Use this tool ONLY when the user has provided a file path to a document that needs to be read and processed. If you already have the document content, you do not need to use this tool.",
                 "parameters": {
                     "type": "object",
                     "properties": {
