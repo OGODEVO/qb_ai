@@ -22,3 +22,4 @@ fastapi-mcp
 sentry-sdk[fastapi]
 docling
 nltk
+rank_bm25

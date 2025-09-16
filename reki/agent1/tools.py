@@ -3,6 +3,7 @@ from tools.browser import BrowserTool
 from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from tools.google_calendar import get_tools as get_calendar_tools, list_events, add_event, update_event, delete_event
 from tools.document_handler import get_tools as get_document_tools, process_document, suggest_metadata, vectorize_and_store_document
+from tools.bm25 import retrieve_files, get_tools as get_bm25_tools
 from .utils import get_remember_fact_tool
 from .tool_server import get_tool_servers
 import requests
@@ -44,6 +45,9 @@ def get_tools_and_available_functions():
     available_tools["process_document"] = process_document
     available_tools["suggest_metadata"] = suggest_metadata
     available_tools["vectorize_and_store_document"] = vectorize_and_store_document
+
+    tools.extend(get_bm25_tools())
+    available_tools["retrieve_files"] = retrieve_files
 
     tool_servers = get_tool_servers()
     for server in tool_servers:
