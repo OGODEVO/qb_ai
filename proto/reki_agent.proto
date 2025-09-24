@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package reki_agent;
+
+// The service definition.
+service RekiAgent {
+  // A bidirectional streaming RPC.
+  rpc Chat(stream ChatRequest) returns (stream ChatResponse);
+}
+
+// The request message containing the user's query.
+message ChatRequest {
+  // The ID of the actor that is sending the request.
+  string actor_id = 1;
+  // The message from the actor.
+  string message = 2;
+}
+
+// The response message containing the agent's response.
+message ChatResponse {
+  // The ID of the actor that the response is for.
+  string actor_id = 1;
+  // The response from the agent.
+  string message = 2;
+}
