@@ -4,6 +4,7 @@ from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from tools.google_calendar import get_tools as get_calendar_tools, list_events, add_event, update_event, delete_event
 from tools.document_handler import get_tools as get_document_tools, process_document, suggest_metadata, vectorize_and_store_document
 from tools.bm25 import retrieve_files, get_tools as get_bm25_tools
+from tools.nba import get_tools as get_nba_tools, get_player_career_stats, get_live_scoreboard, get_scoreboard, get_boxscore_advanced, get_play_by_play, get_odds
 from .utils import get_remember_fact_tool
 from .tool_server import get_tool_servers
 import requests
@@ -48,6 +49,14 @@ def get_tools_and_available_functions():
 
     tools.extend(get_bm25_tools())
     available_tools["retrieve_files"] = retrieve_files
+
+    tools.extend(get_nba_tools())
+    available_tools["get_player_career_stats"] = get_player_career_stats
+    available_tools["get_live_scoreboard"] = get_live_scoreboard
+    available_tools["get_scoreboard"] = get_scoreboard
+    available_tools["get_boxscore_advanced"] = get_boxscore_advanced
+    available_tools["get_play_by_play"] = get_play_by_play
+    available_tools["get_odds"] = get_odds
 
     tool_servers = get_tool_servers()
     for server in tool_servers:

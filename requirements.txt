@@ -23,3 +23,6 @@ sentry-sdk[fastapi]
 docling
 nltk
 rank_bm25
+nba_api
+numpy
+pandas
