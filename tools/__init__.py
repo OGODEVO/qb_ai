@@ -3,3 +3,4 @@ from . import meta_ads
 from . import quickbooks
 from . import google_calendar
 from . import document_handler
+from . import sportradar
