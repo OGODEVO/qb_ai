@@ -36,7 +36,7 @@ def get_live_game_stats(game_id: str):
     if not SPORTRADAR_API_KEY:
         return "Sportradar API key not found. Please add it to your .env file."
 
-    pbp_response = requests.get(f"{BASE_URL}/games/{game_id}/pbp.json?api_key={SPORTRADAR_API_KEY}")
+    pbp_response = requests.get(f"{BASE_URL}/games/{game_id}/pbp.json?api_key={SPORTRADAR_API_KEY}", headers={"Accept-Encoding": "identity"})
     pbp_response.raise_for_status()
     return pbp_response.json()
 

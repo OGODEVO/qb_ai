@@ -174,5 +174,6 @@ async def stream_generator(client, model, messages, tools, available_tools):
         stream=True
     )
 
-    async for chunk in final_response_stream:
-        yield chunk
+    if final_response_stream:
+        async for chunk in final_response_stream:
+            yield chunk
