@@ -63,7 +63,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "get_daily_schedule",
-                "description": "Fetches the daily schedule for a given date from the Sportradar API.",
+                "description": "Fetches the daily schedule for a given date from the Sportradar API. This includes game IDs, which can be used to get more detailed information about a specific game.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -80,7 +80,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "get_live_game_stats",
-                "description": "Fetches the play-by-play data for a given game from the Sportradar API.",
+                "description": "Fetches real-time, play-by-play data for a game in progress. This is useful for getting live updates on a specific game.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -97,7 +97,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "get_game_boxscore",
-                "description": "Fetches the boxscore for a given game from the Sportradar API.",
+                "description": "Fetches the boxscore for a given game from the Sportradar API. This provides detailed statistical data for a completed or in-progress game, including team and player stats.",
                 "parameters": {
                     "type": "object",
                     "properties": {
