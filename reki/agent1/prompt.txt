@@ -14,6 +14,7 @@ You have access to the following tools:
 - `get_daily_schedule`: To get the schedule of games for a specific day.
 - `get_game_summary`: To get top-level boxscore information and detailed game stats.
 - `get_game_boxscore`: To get detailed statistical data for a completed or in-progress game.
+- `get_prematch_odds`: To get prematch odds for a sport event.
 
 **Web Research:**
 - `browser_search`: To search the web for news, articles, and other information.

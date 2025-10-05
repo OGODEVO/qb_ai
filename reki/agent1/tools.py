@@ -4,7 +4,7 @@ from tools.meta_ads import meta_ads_query, get_tools as get_meta_ads_tools
 from tools.google_calendar import get_tools as get_calendar_tools, list_events, add_event, update_event, delete_event
 from tools.document_handler import get_tools as get_document_tools, process_document, suggest_metadata, vectorize_and_store_document
 from tools.bm25 import retrieve_files, get_tools as get_bm25_tools
-from tools.sportradar import get_tools as get_sportradar_tools, get_daily_schedule, get_game_boxscore, get_game_summary
+from tools.sportradar import get_tools as get_sportradar_tools, get_daily_schedule, get_game_boxscore, get_game_summary, get_prematch_odds
 from .utils import get_remember_fact_tool
 from .tool_server import get_tool_servers
 import requests
@@ -54,6 +54,7 @@ def get_tools_and_available_functions():
     available_tools["get_daily_schedule"] = get_daily_schedule
     available_tools["get_game_boxscore"] = get_game_boxscore
     available_tools["get_game_summary"] = get_game_summary
+    available_tools["get_prematch_odds"] = get_prematch_odds
 
     tool_servers = get_tool_servers()
     for server in tool_servers:
