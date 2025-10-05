@@ -59,7 +59,7 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
     )
 
     if not response_message.tool_calls:
-        yield Completion(choices=[Choice(message=response_message)])
+        yield Completion(choices=[Choice(message={"content": response_message.content})])
         return
 
     final_messages.append(response_message)
