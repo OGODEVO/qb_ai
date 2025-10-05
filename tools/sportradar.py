@@ -6,9 +6,7 @@ from datetime import datetime
 load_dotenv()
 
 SPORTRADAR_API_KEY = os.getenv("SPORTRADAR_API_KEY")
-SPORTRADAR_ODDS_API_KEY = os.getenv("SPORTRADAR_ODDS_API_KEY")
 BASE_URL = "https://api.sportradar.us/nba/production/v8/en"
-ODDS_BASE_URL = "https://api.sportradar.com/oddscomparison-rowt1/v2"
 
 def get_daily_schedule(date: str = None):
     """
@@ -54,20 +52,6 @@ def get_game_summary(gameId: str):
     summary_response = requests.get(f"{BASE_URL}/games/{gameId}/summary.json?api_key={SPORTRADAR_API_KEY}")
     summary_response.raise_for_status()
     return summary_response.json()
-
-def get_prematch_odds(sport_event_id: str):
-    """
-    Fetches the prematch odds for a given sport event from the Sportradar Odds API.
-
-    Args:
-        sport_event_id: The ID of the sport event (e.g., sr:match:12345).
-    """
-    if not SPORTRADAR_ODDS_API_KEY:
-        return "Sportradar Odds API key not found. Please add it to your .env file."
-
-    odds_response = requests.get(f"{ODDS_BASE_URL}/en/sport_events/{sport_event_id}/markets.json?api_key={SPORTRADAR_ODDS_API_KEY}")
-    odds_response.raise_for_status()
-    return odds_response.json()
 
 def get_tools():
     """
@@ -122,23 +106,6 @@ def get_tools():
                         }
                     },
                     "required": ["gameId"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "get_prematch_odds",
-                "description": "Fetches the prematch odds for a given sport event from the Sportradar Odds API.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "sport_event_id": {
-                            "type": "string",
-                            "description": "The ID of the sport event (e.g., sr:match:12345)."
-                        }
-                    },
-                    "required": ["sport_event_id"],
                 },
             },
         },
