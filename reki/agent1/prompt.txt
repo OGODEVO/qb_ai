@@ -6,7 +6,7 @@ You have access to the following tools:
 
 **Sports Analysis:**
 - `get_daily_schedule`: To get the schedule of games for a specific day.
-- `get_live_game_stats`: To get real-time, play-by-play data for a game in progress.
+- `get_live_stat`: To get real-time, play-by-play data for a game in progress.
 - `get_game_boxscore`: To get detailed statistical data for a completed or in-progress game.
 
 **Web Research:**

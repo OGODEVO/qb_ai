@@ -54,6 +54,12 @@ def get_game_boxscore(game_id: str):
     boxscore_response.raise_for_status()
     return boxscore_response.json()
 
+def get_live_stat(game_id: str):
+    """
+    Fetches the play-by-play data for a given game from the Sportradar API.
+    """
+    return get_live_game_stats(game_id)
+
 def get_tools():
     """
     Returns a list of tools for the Sportradar API.
@@ -79,7 +85,7 @@ def get_tools():
         {
             "type": "function",
             "function": {
-                "name": "get_live_game_stats",
+                "name": "get_live_stat",
                 "description": "Fetches real-time, play-by-play data for a game in progress. This is useful for getting live updates on a specific game.",
                 "parameters": {
                     "type": "object",
