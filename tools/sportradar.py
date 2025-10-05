@@ -1,4 +1,3 @@
-
 import os
 import requests
 from dotenv import load_dotenv
@@ -26,39 +25,33 @@ def get_daily_schedule(date: str = None):
     schedule_response.raise_for_status()
     return schedule_response.json()
 
-def get_live_game_stats(game_id: str):
-    """
-    Fetches the play-by-play data for a given game from the Sportradar API.
-
-    Args:
-        game_id: The ID of the game.
-    """
-    if not SPORTRADAR_API_KEY:
-        return "Sportradar API key not found. Please add it to your .env file."
-
-    pbp_response = requests.get(f"{BASE_URL}/games/{game_id}/pbp.json?api_key={SPORTRADAR_API_KEY}", headers={"Accept-Encoding": "identity"})
-    pbp_response.raise_for_status()
-    return pbp_response.json()
-
-def get_game_boxscore(game_id: str):
+def get_game_boxscore(gameId: str):
     """
     Fetches the boxscore for a given game from the Sportradar API.
 
     Args:
-        game_id: The ID of the game.
+        gameId: The ID of the game.
     """
     if not SPORTRADAR_API_KEY:
         return "Sportradar API key not found. Please add it to your .env file."
 
-    boxscore_response = requests.get(f"{BASE_URL}/games/{game_id}/boxscore.json?api_key={SPORTRADAR_API_KEY}")
+    boxscore_response = requests.get(f"{BASE_URL}/games/{gameId}/boxscore.json?api_key={SPORTRADAR_API_KEY}")
     boxscore_response.raise_for_status()
     return boxscore_response.json()
 
-def get_live_stat(game_id: str):
+def get_game_summary(gameId: str):
     """
-    Fetches the play-by-play data for a given game from the Sportradar API.
+    Fetches the game summary for a given game from the Sportradar API.
+
+    Args:
+        gameId: The ID of the game.
     """
-    return get_live_game_stats(game_id)
+    if not SPORTRADAR_API_KEY:
+        return "Sportradar API key not found. Please add it to your .env file."
+
+    summary_response = requests.get(f"{BASE_URL}/games/{gameId}/summary.json?api_key={SPORTRADAR_API_KEY}")
+    summary_response.raise_for_status()
+    return summary_response.json()
 
 def get_tools():
     """
@@ -85,34 +78,34 @@ def get_tools():
         {
             "type": "function",
             "function": {
-                "name": "get_live_stat",
-                "description": "Fetches real-time, play-by-play data for a game in progress. This is useful for getting live updates on a specific game.",
+                "name": "get_game_boxscore",
+                "description": "Fetches the boxscore for a given game from the Sportradar API. This provides detailed statistical data for a completed or in-progress game, including team and player stats.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "game_id": {
+                        "gameId": {
                             "type": "string",
                             "description": "The ID of the game."
                         }
                     },
-                    "required": ["game_id"],
+                    "required": ["gameId"],
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "get_game_boxscore",
-                "description": "Fetches the boxscore for a given game from the Sportradar API. This provides detailed statistical data for a completed or in-progress game, including team and player stats.",
+                "name": "get_game_summary",
+                "description": "Fetches the game summary for a given game from the Sportradar API. This includes top-level boxscore information and detailed game stats for teams and players.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "game_id": {
+                        "gameId": {
                             "type": "string",
                             "description": "The ID of the game."
                         }
                     },
-                    "required": ["game_id"],
+                    "required": ["gameId"],
                 },
             },
         },

@@ -84,7 +84,32 @@ async def chat_completions(request: ChatCompletionRequest):
             response = await anext(response_generator, None)
 
             if not response:
-                 raise HTTPException(status_code=500, detail="Agent did not produce a response.")
+                raise HTTPException(status_code=500, detail="Agent did not produce a response.")
+
+            if response.tool_calls:
+                return {
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "tool_calls": [
+                                    {
+                                        "id": tool_call.id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": tool_call.function.name,
+                                            "arguments": tool_call.function.arguments,
+                                        },
+                                    }
+                                    for tool_call in response.tool_calls
+                                ],
+                            },
+                            "finish_reason": "tool_calls",
+                        }
+                    ],
+                    "model": request.model,
+                }
 
             content = response.choices[0].message.content if response.choices else ""
 
