@@ -60,7 +60,7 @@ Here is the document:
 
 
     response = client.chat.completions.create(
-        model="grok-3-fast",
+        model="grok-4-fast-reasoning",
         messages=[
             {"role": "user", "content": prompt},
         ],

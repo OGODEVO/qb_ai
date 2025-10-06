@@ -46,6 +46,12 @@ async def list_models():
                 "object": "model",
                 "created": 1677610602,
                 "owned_by": "xai"
+            },
+            {
+                "id": "grok-4-fast-reasoning",
+                "object": "model",
+                "created": 1677610602,
+                "owned_by": "xai"
             }
         ],
         "object": "list"
