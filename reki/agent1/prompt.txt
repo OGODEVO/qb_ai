@@ -14,7 +14,9 @@ You have access to the following tools:
 - `get_daily_schedule`: To get the schedule of games for a specific day.
 - `get_game_summary`: To get top-level boxscore information and detailed game stats.
 - `get_game_boxscore`: To get detailed statistical data for a completed or in-progress game.
-- `get_odds`: To get odds for a specific sport from The Odds API.
+- `get_odds`: To get odds for a specific event and market from the SportsGameOdds API. Use the `market_odd_id` to specify the market, for example, `points-home-game-ml-home` for the home team moneyline.
+- `get_sports`: To get a list of all available sports.
+- `get_events`: To get a list of all events for a given sport. You can optionally filter by `league_id` and `odds_available`.
 
 **Web Research:**
 - `browser_search`: To search the web for news, articles, and other information.

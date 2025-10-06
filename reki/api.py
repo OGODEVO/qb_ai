@@ -86,9 +86,15 @@ async def chat_completions(request: ChatCompletionRequest):
             if not response:
                 raise HTTPException(status_code=500, detail="Agent did not produce a response.")
 
-            tool_calls = None
-            if response.choices and hasattr(response.choices[0].message, 'tool_calls'):
-                tool_calls = response.choices[0].message.tool_calls
+            # Determine the actual message object based on the response structure
+            if hasattr(response, 'choices') and response.choices:
+                # Response is a Completion object with a 'choices' attribute
+                message = response.choices[0].message
+            else:
+                # Response is a direct ChatCompletionMessage object
+                message = response
+
+            tool_calls = getattr(message, 'tool_calls', None)
 
             if tool_calls:
                 return {
@@ -116,12 +122,10 @@ async def chat_completions(request: ChatCompletionRequest):
                 }
 
             content = ""
-            if response.choices:
-                message = response.choices[0].message
-                if isinstance(message, dict):
-                    content = message.get('content', '')
-                else:
-                    content = message.content
+            if isinstance(message, dict):
+                content = message.get('content', '')
+            else:
+                content = getattr(message, 'content', '')
 
             if content:
                 short_term_memory.add_message("assistant", content)

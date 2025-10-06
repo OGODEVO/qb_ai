@@ -5,7 +5,8 @@ from tools.google_calendar import get_tools as get_calendar_tools, list_events, 
 from tools.document_handler import get_tools as get_document_tools, process_document, suggest_metadata, vectorize_and_store_document
 from tools.bm25 import retrieve_files, get_tools as get_bm25_tools
 from tools.sportradar import get_tools as get_sportradar_tools, get_daily_schedule, get_game_boxscore, get_game_summary
-from tools.the_odds_api import get_tools as get_odds_tools, get_odds
+from tools.sports_game_odds import get_tools as get_odds_tools, get_odds, get_sports, get_events
+from tools.serpapi import get_tools as get_serpapi_tools, search as serpapi_search
 from .utils import get_remember_fact_tool
 from .tool_server import get_tool_servers
 import requests
@@ -58,6 +59,11 @@ def get_tools_and_available_functions():
 
     tools.extend(get_odds_tools())
     available_tools["get_odds"] = get_odds
+    available_tools["get_sports"] = get_sports
+    available_tools["get_events"] = get_events
+
+    tools.extend(get_serpapi_tools())
+    available_tools["serpapi_search"] = serpapi_search
 
     tool_servers = get_tool_servers()
     for server in tool_servers:
