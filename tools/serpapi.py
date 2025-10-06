@@ -35,7 +35,7 @@ def get_tools():
             "type": "function",
             "function": {
                 "name": "serpapi_search",
-                "description": "Searches the web using SerpApi's Google Search.",
+                "description": "Leverages the SerpApi service to conduct real-time, comprehensive Google searches. This tool is ideal for accessing up-to-date information, answering questions about current events, or finding specific details on a wide range of topics by querying the Google search engine.",
                 "parameters": {
                     "type": "object",
                     "properties": {
