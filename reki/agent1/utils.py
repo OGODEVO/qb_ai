@@ -5,6 +5,7 @@ This module provides utility functions for the application.
 import os
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger('self_improvement_logger')
 
@@ -30,7 +31,7 @@ def get_current_time():
     """
     Returns the current date and time as a formatted string.
     """
-    return datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+    return datetime.now(ZoneInfo("America/Chicago")).strftime("%A, %B %d, %Y %I:%M %p")
 
 def get_remember_fact_tool():
     """
