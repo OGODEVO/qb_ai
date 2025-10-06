@@ -1,5 +1,5 @@
 import os
-from serpapi import GoogleSearch
+import serpapi
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,9 +24,8 @@ def search(query: str) -> str:
         "api_key": api_key,
     }
 
-    search = GoogleSearch(params)
-    results = search.get_dict()
-    return str(results)
+    results = serpapi.search(params)
+    return str(results.as_dict())
 
 def get_tools():
     """Returns a list of tools for SerpApi."""
