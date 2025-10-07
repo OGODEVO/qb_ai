@@ -75,11 +75,29 @@ async def chat_completions(request: ChatCompletionRequest):
         if request.stream:
             async def stream_generator():
                 async for chunk in handle_chat_completion(short_term_memory, request.model, request.stream):
-                    if chunk.choices[0].delta.content:
+                    data = {}
+                    if chunk.choices[0].delta.tool_calls:
+                        tool_calls = [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in chunk.choices[0].delta.tool_calls
+                        ]
+                        data = {
+                            "choices": [{"delta": {"tool_calls": tool_calls}}],
+                            "model": request.model
+                        }
+                    elif chunk.choices[0].delta.content:
                         data = {
                             "choices": [{"delta": {"content": chunk.choices[0].delta.content}}],
                             "model": request.model
                         }
+                    
+                    if data:
                         yield f"data: {json.dumps(data)}\n\n"
                 yield "data: [DONE]\n\n"
 
