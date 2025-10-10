@@ -110,6 +110,7 @@ async def stream_generator(client, model, messages, tools, available_tools):
 
     max_turns = 5
     turn_count = 0
+    has_yielded_content = False
     while turn_count < max_turns:
         tool_calls = []
         async for chunk in stream_response:
@@ -122,9 +123,16 @@ async def stream_generator(client, model, messages, tools, available_tools):
                         tool_calls[tool_call_chunk.index].function.arguments += tool_call_chunk.function.arguments
             
             yield chunk
+            has_yielded_content = True
 
         if not tool_calls:
-            return
+            if has_yielded_content:
+                return 
+            else:
+                # Handle cases where the model returns an empty stream
+                # (e.g., content filtering)
+                yield Completion(choices=[Choice(message={"role": "assistant", "content": ""})])
+                return
 
         # Reconstruct the full tool calls
         assistant_message = {

@@ -27,3 +27,4 @@ credentials.json
 token.json
 /.devcontainer
 conversation_log.json
+uv.lock
