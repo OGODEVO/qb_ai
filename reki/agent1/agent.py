@@ -26,7 +26,7 @@ try:
     )
     reki_1_client = AsyncOpenAI(
         api_key="no-key-needed",
-        base_url="http://localhost:8787/v1",
+        base_url="http://localhost:11434/v1",
     )
 except KeyError:
     raise RuntimeError("Missing xAI credentials. Please set XAI_API_KEY and XAI_BASE_URL in your .env file.")
