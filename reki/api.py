@@ -52,6 +52,12 @@ async def list_models():
                 "object": "model",
                 "created": 1677610602,
                 "owned_by": "xai"
+            },
+            {
+                "id": "reki-1",
+                "object": "model",
+                "created": 1677610602,
+                "owned_by": "user"
             }
         ],
         "object": "list"
