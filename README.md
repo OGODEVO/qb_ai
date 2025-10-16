@@ -1,2 +1,2 @@
 # Reki - Your AI Assistant
-coming
+coming soon
