@@ -59,7 +59,8 @@ def get_tools():
     """
     return [
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "get_daily_schedule",
                 "description": "Fetches the daily schedule for a given date from the Sportradar API. This includes game IDs, which can be used to get more detailed information about a specific game.",
                 "parameters": {
@@ -72,10 +73,11 @@ def get_tools():
                     },
                     "required": [],
                 },
-            }]
+            },
         },
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "get_game_boxscore",
                 "description": "Fetches the boxscore for a given game from the Sportradar API. This provides detailed statistical data for a completed or in-progress game, including team and player stats.",
                 "parameters": {
@@ -88,10 +90,11 @@ def get_tools():
                     },
                     "required": ["gameId"],
                 },
-            }]
+            },
         },
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "get_game_summary",
                 "description": "Fetches the game summary for a given game from the Sportradar API. This includes top-level boxscore information and detailed game stats for teams and players.",
                 "parameters": {
@@ -104,6 +107,6 @@ def get_tools():
                     },
                     "required": ["gameId"],
                 },
-            }]
+            },
         },
     ]

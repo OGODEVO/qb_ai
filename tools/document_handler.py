@@ -127,7 +127,8 @@ def get_tools():
     """Returns the tools for the document handler."""
     return [
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "process_document",
                 "description": "Reads a document from a local file path and converts it into a clean Markdown format. Use this tool ONLY when the user has provided a file path to a document that needs to be read and processed. If you already have the document content, you do not need to use this tool.",
                 "parameters": {
@@ -140,10 +141,11 @@ def get_tools():
                     },
                     "required": ["file_path"]
                 }
-            }]
+            }
         },
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "suggest_metadata",
                 "description": "Analyzes the provided document content and suggests relevant metadata, including a concise title, a set of descriptive tags (keywords), and a brief summary. This is useful for cataloging, organizing, and enabling efficient retrieval of documents.",
                 "parameters": {
@@ -156,10 +158,11 @@ def get_tools():
                     },
                     "required": ["document_content"]
                 }
-            }]
+            }
         },
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "vectorize_and_store_document",
                 "description": "Takes the text content of a document and its corresponding metadata, generates vector embeddings from the content, and then stores the text, metadata, and embeddings in a specialized vector database. This is the final step in processing a document and making it available for semantic search and retrieval.",
                 "parameters": {
@@ -176,6 +179,6 @@ def get_tools():
                     },
                     "required": ["document_content", "metadata"]
                 }
-            }]
+            }
         }
     ]

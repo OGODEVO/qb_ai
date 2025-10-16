@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from collections import namedtuple
 from .tools import get_tools_and_available_functions
 from .short_term_memory import ShortTermMemory
-from .utils import make_api_call, make_gemini_api_call, get_current_time, convert_messages_to_gemini_format
+from .utils import make_api_call, make_gemini_api_call, get_current_time, convert_messages_to_gemini_format, convert_tools_for_gemini
 
 # Mock objects to wrap messages for API compatibility
 Choice = namedtuple('Choice', ['message'])
@@ -67,16 +67,17 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
             messages_for_gemini = final_messages
 
         converted_messages = convert_messages_to_gemini_format(messages_for_gemini)
+        gemini_tools = convert_tools_for_gemini(tools)
 
         if stream:
-            async for chunk in gemini_stream_generator(model, converted_messages, tools, available_tools, system_instruction):
+            async for chunk in gemini_stream_generator(model, converted_messages, gemini_tools, available_tools, system_instruction):
                 yield chunk
             return
         
         response = await make_gemini_api_call(
             model=model,
             contents=converted_messages,
-            tools=tools,
+            tools=gemini_tools,
             system_instruction=system_instruction
         )
 
@@ -121,7 +122,7 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
             response = await make_gemini_api_call(
                 model=model,
                 contents=converted_messages,
-                tools=tools,
+                tools=gemini_tools,
                 system_instruction=system_instruction
             )
             turn_count += 1
@@ -188,10 +189,11 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
 
 async def gemini_stream_generator(model, messages, tools, available_tools, system_instruction=None):
     """Generator function to handle streaming responses and tool calls for Gemini."""
+    gemini_tools = convert_tools_for_gemini(tools)
     stream_response = await make_gemini_api_call(
         model=model,
         contents=messages,
-        tools=tools,
+        tools=gemini_tools,
         stream=True,
         system_instruction=system_instruction
     )
@@ -250,7 +252,12 @@ async def gemini_stream_generator(model, messages, tools, available_tools, syste
         # Append the model's response with tool calls to the history
         messages.append({
             "role": "model",
-            "parts": [{"function_call": fc} for fc in full_tool_calls]
+            "parts": [{
+                "function_call": {
+                    "name": fc.name,
+                    "args": dict(fc.args)
+                }
+            } for fc in full_tool_calls]
         })
         
         tool_responses = []
@@ -286,7 +293,7 @@ async def gemini_stream_generator(model, messages, tools, available_tools, syste
         stream_response = await make_gemini_api_call(
             model=model,
             contents=messages,
-            tools=tools,
+            tools=gemini_tools,
             stream=True,
             system_instruction=system_instruction
         )

@@ -249,7 +249,8 @@ def get_tools() -> list[dict]:
     """Returns the tool definition for the qb_query function."""
     return [
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "qb_query",
                 "description": "Query QuickBooks for financial data like expenses, revenue, and reports.",
                 "parameters": {
@@ -286,6 +287,6 @@ def get_tools() -> list[dict]:
                     },
                     "required": ["report", "start_date", "end_date"],
                 },
-            }]
+            },
         }
     ]

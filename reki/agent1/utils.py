@@ -13,11 +13,15 @@ logger = logging.getLogger('self_improvement_logger')
 
 async def make_api_call(client, **kwargs):
     """Makes an API call to the specified client and model."""
-    if kwargs.get("stream"):
-        return await client.chat.completions.create(**kwargs)
-    else:
-        response = await client.chat.completions.create(**kwargs)
-        return response.choices[0].message
+    try:
+        if kwargs.get("stream"):
+            return await client.chat.completions.create(**kwargs)
+        else:
+            response = await client.chat.completions.create(**kwargs)
+            return response.choices[0].message
+    except Exception as e:
+        logger.error(f"Error during API call: {e}")
+        return None
 
 async def make_gemini_api_call(model, system_instruction=None, **kwargs):
     """Makes an API call to the Gemini API."""
@@ -54,7 +58,8 @@ def get_remember_fact_tool():
     Returns the 'remember_fact' tool definition.
     """
     return {
-        "function_declarations": [{
+        "type": "function",
+        "function": {
             "name": "remember_fact",
             "description": "Saves a specific fact or piece of information to the agent's long-term memory. Use this when the user explicitly asks to remember something.",
             "parameters": {
@@ -67,8 +72,19 @@ def get_remember_fact_tool():
                 },
                 "required": ["fact"],
             },
-        }]
+        },
     }
+
+def convert_tools_for_gemini(tools):
+    """Converts a list of OpenAI-formatted tools to the Gemini format."""
+    gemini_tools = []
+    for t in tools:
+        func = t.get("function", t)
+        func.pop("type", None)
+        gemini_tools.append({
+            "function_declarations": [func]
+        })
+    return gemini_tools
 
 def convert_messages_to_gemini_format(messages):
     """Converts a list of OpenAI-formatted messages to the Gemini format."""

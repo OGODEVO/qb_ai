@@ -31,7 +31,8 @@ def get_tools():
     """Returns a list of tools for SerpApi."""
     return [
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "serpapi_search",
                 "description": "Leverages the SerpApi service to conduct real-time, comprehensive Google searches. This tool is ideal for accessing up-to-date information, answering questions about current events, or finding specific details on a wide range of topics by querying the Google search engine.",
                 "parameters": {
@@ -44,6 +45,6 @@ def get_tools():
                     },
                     "required": ["query"],
                 },
-            }]
+            },
         }
     ]

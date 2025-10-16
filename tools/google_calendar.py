@@ -131,7 +131,8 @@ def delete_event(event_id):
 def get_tools():
     return [
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "list_events",
                 "description": "Lists upcoming events from the user's primary Google Calendar, ordered by start time.",
                 "parameters": {
@@ -139,15 +140,16 @@ def get_tools():
                     "properties": {
                         "max_results": {
                             "type": "integer",
-                            "description": "The maximum number of events to return."
+                            "description": "The maximum number of events to return.",
                         }
                     },
                     "required": [],
                 },
-            }]
+            },
         },
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "add_event",
                 "description": "Adds a new event to the user's primary Google Calendar. Requires a summary (title), start time, and end time.",
                 "parameters": {
@@ -166,10 +168,11 @@ def get_tools():
                     },
                     "required": ["summary", "start_time", "end_time"],
                 },
-            }]
+            },
         },
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "update_event",
                 "description": "Updates an existing event on the user's primary Google Calendar. Requires the event ID and the new details for the event.",
                 "parameters": {
@@ -189,10 +192,11 @@ def get_tools():
                     },
                     "required": ["event_id", "summary", "start_time", "end_time"],
                 },
-            }]
+            },
         },
         {
-            "function_declarations": [{
+            "type": "function",
+            "function": {
                 "name": "delete_event",
                 "description": "Deletes an event from the user's primary Google Calendar, given an event ID.",
                 "parameters": {
@@ -202,6 +206,6 @@ def get_tools():
                     },
                     "required": ["event_id"],
                 },
-            }]
+            },
         }
     ]
