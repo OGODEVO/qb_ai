@@ -139,8 +139,7 @@ def get_tools():
                     "properties": {
                         "max_results": {
                             "type": "integer",
-                            "description": "The maximum number of events to return.",
-                            "default": 10,
+                            "description": "The maximum number of events to return."
                         }
                     },
                     "required": [],
