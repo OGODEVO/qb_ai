@@ -5,6 +5,7 @@ This module provides utility functions for the application.
 import os
 import logging
 import google.generativeai as genai
+import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -18,10 +19,15 @@ async def make_api_call(client, **kwargs):
         response = await client.chat.completions.create(**kwargs)
         return response.choices[0].message
 
-async def make_gemini_api_call(model, **kwargs):
+async def make_gemini_api_call(model, system_instruction=None, **kwargs):
     """Makes an API call to the Gemini API."""
     try:
-        gemini_model = genai.GenerativeModel(model)
+        model_args = {}
+        if system_instruction:
+            model_args['system_instruction'] = system_instruction
+        
+        gemini_model = genai.GenerativeModel(model, **model_args)
+        
         if kwargs.get("stream"):
             return await gemini_model.generate_content_async(**kwargs)
         else:
@@ -63,3 +69,48 @@ def get_remember_fact_tool():
             },
         }]
     }
+
+def convert_messages_to_gemini_format(messages):
+    """Converts a list of OpenAI-formatted messages to the Gemini format."""
+    gemini_messages = []
+    for message in messages:
+        role = message.get("role")
+        if role == "assistant":
+            role = "model"
+        
+        if role not in ["user", "model", "tool"]:
+            continue
+
+        parts = []
+        if message.get("tool_calls"):
+            for tc in message["tool_calls"]:
+                try:
+                    args = json.loads(tc["function"]["arguments"])
+                except (json.JSONDecodeError, TypeError):
+                    args = tc["function"]["arguments"]
+
+                parts.append({
+                    "function_call": {
+                        "name": tc["function"]["name"],
+                        "args": args
+                    }
+                })
+            gemini_messages.append({"role": "model", "parts": parts})
+        elif role == "tool":
+            try:
+                response_content = json.loads(message["content"])
+            except (json.JSONDecodeError, TypeError):
+                response_content = message["content"]
+                
+            parts.append({
+                "function_response": {
+                    "name": message.get("name") or message.get("tool_code"),
+                    "response": response_content
+                }
+            })
+            gemini_messages.append({"role": "tool", "parts": parts})
+        elif message.get("content") is not None:
+            parts.append({"text": message["content"]})
+            gemini_messages.append({"role": role, "parts": parts})
+            
+    return gemini_messages

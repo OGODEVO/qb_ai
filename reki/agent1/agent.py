@@ -7,11 +7,18 @@ from dotenv import load_dotenv
 from collections import namedtuple
 from .tools import get_tools_and_available_functions
 from .short_term_memory import ShortTermMemory
-from .utils import make_api_call, make_gemini_api_call, get_current_time
+from .utils import make_api_call, make_gemini_api_call, get_current_time, convert_messages_to_gemini_format
 
 # Mock objects to wrap messages for API compatibility
 Choice = namedtuple('Choice', ['message'])
 Completion = namedtuple('Completion', ['choices'])
+
+# Mock objects for streaming responses
+Delta = namedtuple('Delta', ['content', 'tool_calls'])
+ChoiceChunk = namedtuple('ChoiceChunk', ['delta'])
+CompletionChunk = namedtuple('CompletionChunk', ['choices'])
+ToolCall = namedtuple('ToolCall', ['id', 'type', 'function'])
+Function = namedtuple('Function', ['name', 'arguments'])
 
 # --- Initialization ---
 load_dotenv(override=True)
@@ -52,55 +59,76 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
     final_messages = [{"role": "system", "content": system_prompt}] + messages
 
     if "gemini" in model:
+        system_instruction = None
+        if final_messages and final_messages[0]['role'] == 'system':
+            system_instruction = final_messages[0]['content']
+            messages_for_gemini = final_messages[1:]
+        else:
+            messages_for_gemini = final_messages
+
+        converted_messages = convert_messages_to_gemini_format(messages_for_gemini)
+
         if stream:
-            async for chunk in gemini_stream_generator(model, final_messages, tools, available_tools):
+            async for chunk in gemini_stream_generator(model, converted_messages, tools, available_tools, system_instruction):
                 yield chunk
             return
         
         response = await make_gemini_api_call(
             model=model,
-            contents=final_messages,
+            contents=converted_messages,
             tools=tools,
+            system_instruction=system_instruction
         )
-        response_message = response.candidates[0].content.parts[0]
 
         max_turns = 5
         turn_count = 0
-        while response_message.function_call and turn_count < max_turns:
-            final_messages.append(response_message)
+        while response.candidates[0].content.parts[0].function_call and turn_count < max_turns:
+            response_content = response.candidates[0].content
+            converted_messages.append({
+                "role": response_content.role,
+                "parts": [part.to_dict() for part in response_content.parts]
+            })
 
-            tool_call = response_message.function_call
+            tool_call = response_content.parts[0].function_call
             function_name = tool_call.name
             function_to_call = available_tools.get(function_name)
             if function_to_call:
                 try:
                     function_args = dict(tool_call.args)
                     function_response = function_to_call(**function_args)
-                    tool_response_content = json.dumps(function_response)
-                    final_messages.append({
-                        "tool_code": function_name,
+                    
+                    converted_messages.append({
                         "role": "tool",
-                        "content": tool_response_content,
+                        "parts": [{
+                            "function_response": {
+                                "name": function_name,
+                                "response": function_response
+                            }
+                        }]
                     })
                 except Exception as e:
                     error_content = json.dumps({"error": str(e)})
-                    final_messages.append({
-                        "tool_code": function_name,
+                    converted_messages.append({
                         "role": "tool",
-                        "content": error_content,
+                        "parts": [{
+                            "function_response": {
+                                "name": function_name,
+                                "response": {"error": str(e)}
+                            }
+                        }]
                     })
             
             response = await make_gemini_api_call(
                 model=model,
-                contents=final_messages,
+                contents=converted_messages,
                 tools=tools,
+                system_instruction=system_instruction
             )
-            response_message = response.candidates[0].content.parts[0]
             turn_count += 1
         
-        yield response_message.text
+        yield response.candidates[0].content.parts[0].text
     else:
-        # Select client based on model
+        # ... (rest of the function remains the same)
         if model == "reki-1":
             current_client = reki_1_client
         else:
@@ -158,18 +186,17 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
         
         yield response_message.content
 
-async def gemini_stream_generator(model, messages, tools, available_tools):
+async def gemini_stream_generator(model, messages, tools, available_tools, system_instruction=None):
     """Generator function to handle streaming responses and tool calls for Gemini."""
     stream_response = await make_gemini_api_call(
         model=model,
         contents=messages,
         tools=tools,
-        stream=True
+        stream=True,
+        system_instruction=system_instruction
     )
 
     if stream_response is None:
-        # Handle cases where the API call might have failed and returned None
-        # Log an error or handle it gracefully
         print("Error: stream_response from make_gemini_api_call is None.")
         return
 
@@ -177,73 +204,94 @@ async def gemini_stream_generator(model, messages, tools, available_tools):
     turn_count = 0
     has_yielded_content = False
     while turn_count < max_turns:
-        tool_calls = []
+        full_tool_calls = []
         async for chunk in stream_response:
             if chunk.candidates[0].content.parts[0].function_call:
                 # Accumulate tool call chunks
                 for tool_call_chunk in chunk.candidates[0].content.parts:
-                    if len(tool_calls) <= 0:
-                        tool_calls.append(tool_call_chunk.function_call)
-                    else:
-                        tool_calls[0].args += tool_call_chunk.function_call.args
-            
-            yield chunk
+                    # This logic is simplified and assumes one tool call per chunk for streaming
+                    # A more robust implementation would handle multiple, partial tool calls
+                    full_tool_calls.append(tool_call_chunk.function_call)
+                    
+                    # Convert to OpenAI-compatible format
+                    delta = Delta(
+                        content=None,
+                        tool_calls=[
+                            ToolCall(
+                                id=tool_call_chunk.function_call.name,  # Using name as ID
+                                type='function',
+                                function=Function(
+                                    name=tool_call_chunk.function_call.name,
+                                    arguments=json.dumps(dict(tool_call_chunk.function_call.args))
+                                )
+                            )
+                        ]
+                    )
+                    yield CompletionChunk(choices=[ChoiceChunk(delta=delta)])
+
+            elif chunk.candidates[0].content.parts[0].text:
+                text = chunk.candidates[0].content.parts[0].text
+                delta = Delta(content=text, tool_calls=None)
+                choice = ChoiceChunk(delta=delta)
+                yield CompletionChunk(choices=[choice])
+
             has_yielded_content = True
 
-        if not tool_calls:
+        if not full_tool_calls:
             if has_yielded_content:
                 return 
             else:
-                # Handle cases where the model returns an empty stream
-                # (e.g., content filtering)
-                yield Completion(choices=[Choice(message={"role": "assistant", "content": ""})])
+                # Handle empty stream
+                delta = Delta(content="", tool_calls=None)
+                choice = ChoiceChunk(delta=delta)
+                yield CompletionChunk(choices=[choice])
                 return
 
-        # Reconstruct the full tool calls
-        assistant_message = {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": tc.name,
-                    "type": "function",
-                    "function": {
-                        "name": tc.name,
-                        "arguments": dict(tc.args)
-                    }
-                } for tc in tool_calls
-            ]
-        }
-        messages.append(assistant_message)
-
-        for tool_call in tool_calls:
+        # Append the model's response with tool calls to the history
+        messages.append({
+            "role": "model",
+            "parts": [{"function_call": fc} for fc in full_tool_calls]
+        })
+        
+        tool_responses = []
+        for tool_call in full_tool_calls:
             function_name = tool_call.name
             function_to_call = available_tools.get(function_name)
             if function_to_call:
                 try:
                     function_args = dict(tool_call.args)
                     function_response = function_to_call(**function_args)
-                    tool_response_content = json.dumps(function_response)
-                    messages.append({
-                        "tool_code": function_name,
+                    tool_responses.append({
                         "role": "tool",
-                        "content": tool_response_content,
+                        "parts": [{
+                            "function_response": {
+                                "name": function_name,
+                                "response": function_response
+                            }
+                        }]
                     })
                 except Exception as e:
-                    error_content = json.dumps({"error": str(e)})
-                    messages.append({
-                        "tool_code": function_name,
+                    tool_responses.append({
                         "role": "tool",
-                        "content": error_content,
+                        "parts": [{
+                            "function_response": {
+                                "name": function_name,
+                                "response": {"error": str(e)}
+                            }
+                        }]
                     })
+        
+        messages.extend(tool_responses)
 
         stream_response = await make_gemini_api_call(
             model=model,
             contents=messages,
             tools=tools,
-            stream=True
+            stream=True,
+            system_instruction=system_instruction
         )
         turn_count += 1
+
 
 async def stream_generator(client, model, messages, tools, available_tools):
     """Generator function to handle streaming responses and tool calls."""
