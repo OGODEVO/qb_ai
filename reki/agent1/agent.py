@@ -1,12 +1,13 @@
 import os
 import json
+import google.generativeai as genai
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 from collections import namedtuple
 from .tools import get_tools_and_available_functions
 from .short_term_memory import ShortTermMemory
-from .utils import make_api_call, get_current_time
+from .utils import make_api_call, make_gemini_api_call, get_current_time
 
 # Mock objects to wrap messages for API compatibility
 Choice = namedtuple('Choice', ['message'])
@@ -16,6 +17,7 @@ Completion = namedtuple('Completion', ['choices'])
 load_dotenv(override=True)
 
 try:
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
     client = AsyncOpenAI(
         api_key=os.environ["XAI_API_KEY"],
         base_url=os.environ["XAI_BASE_URL"],
@@ -25,7 +27,7 @@ try:
         base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
     )
 except KeyError:
-    raise RuntimeError("Missing xAI credentials. Please set XAI_API_KEY and XAI_BASE_URL in your .env file.")
+    raise RuntimeError("Missing credentials. Please set XAI_API_KEY, XAI_BASE_URL, and GEMINI_API_KEY in your .env file.")
 
 # --- System Prompt ---
 try:
@@ -45,57 +47,141 @@ async def handle_chat_completion(short_term_memory: ShortTermMemory, model: str,
     # Prepend system prompt
     final_messages = [{"role": "system", "content": system_prompt}] + messages
 
-    if stream:
-        async for chunk in stream_generator(client, model, final_messages, tools, available_tools):
-            yield chunk
-        return
+    if "gemini" in model:
+        if stream:
+            async for chunk in gemini_stream_generator(model, final_messages, tools, available_tools):
+                yield chunk
+            return
+        
+        response = await make_gemini_api_call(
+            model=model,
+            contents=final_messages,
+            tools=tools,
+        )
+        response_message = response.candidates[0].content.parts[0]
 
-    response_message = await make_api_call(
-        client=client,
-        model=model,
-        messages=final_messages,
-        tools=tools,
-        tool_choice="auto"
-    )
+        max_turns = 5
+        turn_count = 0
+        while response_message.function_call and turn_count < max_turns:
+            final_messages.append(response_message)
 
-    max_turns = 5
-    turn_count = 0
-    while response_message.tool_calls and turn_count < max_turns:
-        final_messages.append(response_message)
-
-        for tool_call in response_message.tool_calls:
-            function_name = tool_call.function.name
+            tool_call = response_message.function_call
+            function_name = tool_call.name
             function_to_call = available_tools.get(function_name)
             if function_to_call:
                 try:
-                    function_args = json.loads(tool_call.function.arguments)
+                    function_args = dict(tool_call.args)
                     function_response = function_to_call(**function_args)
                     tool_response_content = json.dumps(function_response)
                     final_messages.append({
-                        "tool_call_id": tool_call.id,
+                        "tool_code": function_name,
                         "role": "tool",
-                        "name": function_name,
                         "content": tool_response_content,
                     })
                 except Exception as e:
                     error_content = json.dumps({"error": str(e)})
                     final_messages.append({
-                        "tool_call_id": tool_call.id,
+                        "tool_code": function_name,
                         "role": "tool",
-                        "name": function_name,
                         "content": error_content,
                     })
+            
+            response = await make_gemini_api_call(
+                model=model,
+                contents=final_messages,
+                tools=tools,
+            )
+            response_message = response.candidates[0].content.parts[0]
+            turn_count += 1
         
-        response_message = await make_api_call(
-            client=client,
+        yield response_message.text
+
+async def gemini_stream_generator(model, messages, tools, available_tools):
+    """Generator function to handle streaming responses and tool calls for Gemini."""
+    stream_response = await make_gemini_api_call(
+        model=model,
+        contents=messages,
+        tools=tools,
+        stream=True
+    )
+
+    if stream_response is None:
+        # Handle cases where the API call might have failed and returned None
+        # Log an error or handle it gracefully
+        print("Error: stream_response from make_gemini_api_call is None.")
+        return
+
+    max_turns = 5
+    turn_count = 0
+    has_yielded_content = False
+    while turn_count < max_turns:
+        tool_calls = []
+        async for chunk in stream_response:
+            if chunk.candidates[0].content.parts[0].function_call:
+                # Accumulate tool call chunks
+                for tool_call_chunk in chunk.candidates[0].content.parts:
+                    if len(tool_calls) <= 0:
+                        tool_calls.append(tool_call_chunk.function_call)
+                    else:
+                        tool_calls[0].args += tool_call_chunk.function_call.args
+            
+            yield chunk
+            has_yielded_content = True
+
+        if not tool_calls:
+            if has_yielded_content:
+                return 
+            else:
+                # Handle cases where the model returns an empty stream
+                # (e.g., content filtering)
+                yield Completion(choices=[Choice(message={"role": "assistant", "content": ""})])
+                return
+
+        # Reconstruct the full tool calls
+        assistant_message = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": tc.name,
+                    "type": "function",
+                    "function": {
+                        "name": tc.name,
+                        "arguments": dict(tc.args)
+                    }
+                } for tc in tool_calls
+            ]
+        }
+        messages.append(assistant_message)
+
+        for tool_call in tool_calls:
+            function_name = tool_call.name
+            function_to_call = available_tools.get(function_name)
+            if function_to_call:
+                try:
+                    function_args = dict(tool_call.args)
+                    function_response = function_to_call(**function_args)
+                    tool_response_content = json.dumps(function_response)
+                    messages.append({
+                        "tool_code": function_name,
+                        "role": "tool",
+                        "content": tool_response_content,
+                    })
+                except Exception as e:
+                    error_content = json.dumps({"error": str(e)})
+                    messages.append({
+                        "tool_code": function_name,
+                        "role": "tool",
+                        "content": error_content,
+                    })
+
+        stream_response = await make_gemini_api_call(
             model=model,
-            messages=final_messages,
+            contents=messages,
             tools=tools,
-            tool_choice="auto"
+            stream=True
         )
         turn_count += 1
-
-    yield response_message
 
 async def stream_generator(client, model, messages, tools, available_tools):
     """Generator function to handle streaming responses and tool calls."""

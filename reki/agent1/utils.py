@@ -4,6 +4,7 @@ This module provides utility functions for the application.
 
 import os
 import logging
+import google.generativeai as genai
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -19,6 +20,19 @@ async def make_api_call(client, **kwargs):
             return response.choices[0].message
     except Exception as e:
         logger.error(f"Error during API call: {e}")
+        return None
+
+async def make_gemini_api_call(model, **kwargs):
+    """Makes an API call to the Gemini API."""
+    try:
+        gemini_model = genai.GenerativeModel(model)
+        if kwargs.get("stream"):
+            return await gemini_model.generate_content_async(**kwargs)
+        else:
+            response = await gemini_model.generate_content_async(**kwargs)
+            return response
+    except Exception as e:
+        logger.error(f"Error during Gemini API call: {e}")
         return None
 
 def get_project_root():
@@ -38,8 +52,7 @@ def get_remember_fact_tool():
     Returns the 'remember_fact' tool definition.
     """
     return {
-        "type": "function",
-        "function": {
+        "function_declarations": [{
             "name": "remember_fact",
             "description": "Saves a specific fact or piece of information to the agent's long-term memory. Use this when the user explicitly asks to remember something.",
             "parameters": {
@@ -52,5 +65,5 @@ def get_remember_fact_tool():
                 },
                 "required": ["fact"],
             },
-        },
+        }]
     }

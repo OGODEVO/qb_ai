@@ -70,8 +70,7 @@ def get_tools():
     """
     return [
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "get_odds",
                 "description": "Fetches odds for a given event and a specific market ID from the SportsGameOdds API.",
                 "parameters": {
@@ -88,11 +87,10 @@ def get_tools():
                     },
                     "required": ["event_id", "market_odd_id"],
                 },
-            },
+            }]
         },
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "get_events",
                 "description": "Fetches all events for a given sport from the SportsGameOdds API.",
                 "parameters": {
@@ -113,11 +111,10 @@ def get_tools():
                     },
                     "required": ["sport_id"],
                 },
-            },
+            }]
         },
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "get_sports",
                 "description": "Fetches the list of available sports from the SportsGameOdds API.",
                 "parameters": {
@@ -125,6 +122,6 @@ def get_tools():
                     "properties": {},
                     "required": [],
                 },
-            },
+            }]
         },
     ]

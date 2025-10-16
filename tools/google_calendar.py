@@ -131,8 +131,7 @@ def delete_event(event_id):
 def get_tools():
     return [
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "list_events",
                 "description": "Lists upcoming events from the user's primary Google Calendar, ordered by start time.",
                 "parameters": {
@@ -146,11 +145,10 @@ def get_tools():
                     },
                     "required": [],
                 },
-            },
+            }]
         },
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "add_event",
                 "description": "Adds a new event to the user's primary Google Calendar. Requires a summary (title), start time, and end time.",
                 "parameters": {
@@ -169,11 +167,10 @@ def get_tools():
                     },
                     "required": ["summary", "start_time", "end_time"],
                 },
-            },
+            }]
         },
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "update_event",
                 "description": "Updates an existing event on the user's primary Google Calendar. Requires the event ID and the new details for the event.",
                 "parameters": {
@@ -193,11 +190,10 @@ def get_tools():
                     },
                     "required": ["event_id", "summary", "start_time", "end_time"],
                 },
-            },
+            }]
         },
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "delete_event",
                 "description": "Deletes an event from the user's primary Google Calendar, given an event ID.",
                 "parameters": {
@@ -207,6 +203,6 @@ def get_tools():
                     },
                     "required": ["event_id"],
                 },
-            },
+            }]
         }
     ]

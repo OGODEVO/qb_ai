@@ -52,6 +52,12 @@ async def list_models():
                 "object": "model",
                 "created": 1677610602,
                 "owned_by": "xai"
+            },
+            {
+                "id": "gemini-2.5-flash",
+                "object": "model",
+                "created": 1677610602,
+                "owned_by": "google"
             }
         ],
         "object": "list"

@@ -49,8 +49,7 @@ class BrowserTool:
         """
         return [
             {
-                "type": "function",
-                "function": {
+                "function_declarations": [{
                     "name": "browser_search",
                     "description": "Performs a web search using the Brave Search API and returns the search results.",
                     "parameters": {
@@ -63,6 +62,6 @@ class BrowserTool:
                         },
                         "required": ["query"],
                     },
-                },
+                }]
             },
         ]

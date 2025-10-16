@@ -131,8 +131,7 @@ def get_tools() -> list[dict]:
     """Returns the tool definition for the meta_ads_query function."""
     return [
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "meta_ads_query",
                 "description": "Query Meta Ads for advertising data.",
                 "parameters": {
@@ -172,6 +171,6 @@ def get_tools() -> list[dict]:
                     },
                     "required": ["level", "start_date", "end_date", "fields"],
                 },
-            },
+            }]
         }
     ]

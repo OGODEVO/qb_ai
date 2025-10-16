@@ -42,8 +42,7 @@ def retrieve_files(query, top_n=5):
 def get_tools():
     return [
         {
-            "type": "function",
-            "function": {
+            "function_declarations": [{
                 "name": "retrieve_files",
                 "description": "Retrieve files using BM25.",
                 "parameters": {
@@ -60,6 +59,6 @@ def get_tools():
                     },
                     "required": ["query"]
                 }
-            }
+            }]
         }
     ]
